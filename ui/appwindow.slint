@@ -86,7 +86,16 @@ export component MainWindow inherits Window {
 
                 // Divider
                 Rectangle {
-                    width: 1
+                    width: 1px;
+                    height: 20px;
+                    y: 10px;
+                    background: #3e3e3e;
+                }
+
+                IconButton {
+                    icon: @image-url("icons/menu.png");
+                    clicked => { root.toggle-menu(); }
+                }
             }
 
             // Expanded Menu Section (Shows when menu-open == true)
