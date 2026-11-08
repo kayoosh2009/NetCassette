@@ -27,10 +27,10 @@ export component MainWindow inherits Window {
     no-frame: true;
     background: transparent;
     always-on-top: true;
-    width: menu-open ? 680px : 360px;
-    height: menu-open ? 380px : 270px;
+    width: 360px;
+    height: menu-open ? 510px : 270px;
 
-    animate width, height {
+    animate height {
         duration: 250ms;
         easing: ease-out;
     }
@@ -105,13 +105,13 @@ export component MainWindow inherits Window {
             easing: ease-out;
         }
 
-        HorizontalLayout {
+        VerticalLayout {
             padding: 14px;
-            spacing: 14px;
+            spacing: 12px;
 
-            // Main 4:3 Player Area
+            // Main 4:3 Player Area (Top Deck)
             VerticalLayout {
-                width: 332px;
+                height: 242px;
                 spacing: 10px;
 
                 // Simple Top Bar
@@ -220,13 +220,13 @@ export component MainWindow inherits Window {
                 }
             }
 
-            // Clean Menu Section (Opens on demand)
+            // Downward Expanded Menu Section
             if root.menu-open : Rectangle {
+                height: 225px;
                 background: #1d1d1d;
                 border-radius: 10px;
                 border-width: 1px;
                 border-color: #333333;
-                horizontal-stretch: 1;
 
                 VerticalLayout {
                     padding: 14px;
