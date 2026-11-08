@@ -118,13 +118,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
             info!(?pos_after, target_x, target_y, "Window position after set_position request");
 
             // If KWin ignored Winit set_position, try kdotool / xdotool
-            if let Some(actual) = pos_after {
-                if (actual.x as f32 - target_x).abs() > 50.0 {
-                    info!("KWin ignored standard positioning, attempting xdotool fallback... (¬_¬)");
-                    let _ = std::process::Command::new("xdotool")
-                        .args(["search", "--name", "NetCassette", "windowmove", &target_x.to_string(), "0"])
-                        .status();
-                }
+            let actual_x = pos_after.x as f32;
+            if (actual_x - target_x).abs() > 50.0 {
+                info!(actual_x, target_x, "KWin ignored standard positioning, attempting xdotool fallback... (¬_¬)");
+                let _ = std::process::Command::new("xdotool")
+                    .args(["search", "--name", "NetCassette", "windowmove", &target_x.to_string(), "0"])
+                    .status();
             }
         }
     });
