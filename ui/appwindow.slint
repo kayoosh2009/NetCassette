@@ -42,18 +42,49 @@ export component MainWindow inherits Window {
     in-out property <string> track-artist: "Ready";
     in-out property <image> track-cover: @image-url("icons/play.png");
 
+    in-out property <bool> shift-pressed: false;
+    in-out property <length> drag-start-x: 0px;
+    in-out property <length> drag-start-y: 0px;
+
     callback play-clicked();
     callback stop-clicked();
     callback next-clicked();
     callback prev-clicked();
     callback toggle-menu();
     callback hover-changed(bool);
+    callback move-window(length, length);
 
-    // Hover sensor covering the full viewport
+    forward-focus: key-scope;
+    key-scope := FocusScope {
+        key-pressed(e) => {
+            if e.modifiers.shift { root.shift-pressed = true; }
+            reject
+        }
+        key-released(e) => {
+            if !e.modifiers.shift { root.shift-pressed = false; }
+            reject
+        }
+    }
+
+    // Hover & drag sensor covering the full viewport
     hover-sensor := TouchArea {
         width: 100%;
         height: 100%;
-        moved => { root.hover-changed(self.has-hover); }
+        mouse-cursor: root.shift-pressed ? move : default;
+
+        pointer-event(event) => {
+            if event.kind == PointerEventKind.down {
+                root.drag-start-x = self.mouse-x;
+                root.drag-start-y = self.mouse-y;
+            }
+        }
+
+        moved => {
+            root.hover-changed(self.has-hover);
+            if self.pressed && root.shift-pressed {
+                root.move-window(self.mouse-x - root.drag-start-x, self.mouse-y - root.drag-start-y);
+            }
+        }
     }
 
     // Sliding drawer panel

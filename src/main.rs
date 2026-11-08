@@ -6,8 +6,9 @@ use tracing_subscriber::FmtSubscriber;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    let session_type = std::env::var("XDG_SESSION_TYPE").unwrap_or_else(|_| "unknown".into());
-    let wayland_display = std::env::var("WAYLAND_DISPLAY").unwrap_or_else(|_| "none".into());
+    // Unset WAYLAND_DISPLAY so Winit connects via XWayland where KWin allows coordinate manipulation
+    std::env::remove_var("WAYLAND_DISPLAY");
+    std::env::set_var("WINIT_UNIX_BACKEND", "x11");
 
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::INFO)
@@ -15,12 +16,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     tracing::subscriber::set_global_default(subscriber)
         .expect("Failed to initialize tracing logger");
 
-    info!(session = %session_type, wayland = %wayland_display, "Inspecting Linux display environment (⊙_⊙)");
-
-    // Force X11/XWayland backend so KDE KWin allows custom window positioning
-    if std::env::var("WINIT_UNIX_BACKEND").is_err() {
-        std::env::set_var("WINIT_UNIX_BACKEND", "x11");
-    }
+    info!("NetCassette XWayland shift-drag engine armed! (ง ͠° ͟ل͜ ͡°)ง");
 
     let app = MainWindow::new()?;
     let app_handle = app.as_weak();
@@ -29,6 +25,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
     app.on_hover_changed({
         move |is_hovered| {
             info!(is_hovered, "Widget hover state changed (•‿•)");
+        }
+    });
+
+    // Manual Shift + Drag positioning handler
+    app.on_move_window({
+        let handle = app_handle.clone();
+        move |dx, dy| {
+            if let Some(ui) = handle.upgrade() {
+                let current_pos = ui.window().position();
+                let next_x = current_pos.x + dx as i32;
+                let next_y = current_pos.y + dy as i32;
+                ui.window().set_position(slint::PhysicalPosition::new(next_x, next_y));
+            }
         }
     });
 
