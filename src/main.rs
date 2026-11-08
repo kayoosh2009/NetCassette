@@ -65,22 +65,27 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     });
 
-    app.on_minimize_clicked({
-        let handle = app_handle.clone();
-        move || {
-            if let Some(ui) = handle.upgrade() {
-                ui.window().set_minimized(true);
-                info!("Window minimized ( ˘ω˘ )");
-            }
-        }
-    });
+    // Detect screen width under Linux and dock window to the right corner
+    let screen_width = std::fs::read_dir("/sys/class/drm")
+        .ok()
+        .and_then(|mut entries| {
+            entries.find_map(|entry| {
+                let path = entry.ok()?.path().join("modes");
+                let content = std::fs::read_to_string(path).ok()?;
+                let first_mode = content.lines().next()?;
+                let mut parts = first_mode.split('x');
+                let w: f32 = parts.next()?.parse().ok()?;
+                Some(w)
+            })
+        })
+        .unwrap_or(1920.0);
 
-    app.on_close_clicked({
-        move || {
-            info!("Shutting down NetCassette... ( ﾟヮﾟ)ﾉ");
-            std::process::exit(0);
-        }
-    });
+    let window_width = 360.0;
+    let target_x = screen_width - window_width;
+    let target_y = 60.0;
+
+    app.window().set_position(slint::LogicalPosition::new(target_x, target_y));
+    info!(target_x, target_y, "Docked window to top-right screen corner ヽ(>∀<☆)ノ");
 
     app.run()?;
     Ok(())
