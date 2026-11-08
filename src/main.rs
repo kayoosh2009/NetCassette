@@ -16,10 +16,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
     tracing::subscriber::set_global_default(subscriber)
         .expect("Failed to initialize tracing logger");
 
-    info!("NetCassette XWayland shift-drag engine armed! (ง ͠° ͟ل͜ ͡°)ง");
+    info!("NetCassette MPRIS system media listener armed! (ง ͠° ͟ل͜ ͡°)ง");
 
     let app = MainWindow::new()?;
     let app_handle = app.as_weak();
+
+    // Command bridge to send UI clicks to Linux MPRIS players
+    enum MprisCmd { PlayPause, Stop, Next, Previous }
+    let (cmd_tx, mut cmd_rx) = tokio::sync::mpsc::unbounded_channel::<MprisCmd>();
 
     // Hover sensor logger
     app.on_hover_changed({
@@ -41,40 +45,105 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     });
 
-    app.on_play_clicked({
-        let handle = app_handle.clone();
-        move || {
-            if let Some(ui) = handle.upgrade() {
-                let next = !ui.get_is_playing();
-                ui.set_is_playing(next);
-                info!(playing = next, "Play / Pause clicked");
+    // Forward Play/Pause to system player
+    let tx_play = cmd_tx.clone();
+    app.on_play_clicked(move || {
+        let _ = tx_play.send(MprisCmd::PlayPause);
+    });
+
+    // Forward Stop to system player
+    let tx_stop = cmd_tx.clone();
+    app.on_stop_clicked(move || {
+        let _ = tx_stop.send(MprisCmd::Stop);
+    });
+
+    // Forward Previous to system player
+    let tx_prev = cmd_tx.clone();
+    app.on_prev_clicked(move || {
+        let _ = tx_prev.send(MprisCmd::Previous);
+    });
+
+    // Forward Next to system player
+    let tx_next = cmd_tx.clone();
+    app.on_next_clicked(move || {
+        let _ = tx_next.send(MprisCmd::Next);
+    });
+
+    // Background Tokio task: Live MPRIS synchronization & command dispatch
+    let mpris_ui_handle = app_handle.clone();
+    tokio::spawn(async move {
+        let Ok(conn) = zbus::Connection::session().await else {
+            tracing::warn!("Could not connect to session D-Bus for MPRIS");
+            return;
+        };
+
+        let mut last_title = String::new();
+        let mut last_artist = String::new();
+        let mut last_status = false;
+
+        loop {
+            // Check for incoming user button commands
+            while let Ok(cmd) = cmd_rx.try_recv() {
+                if let Ok(dbus) = zbus::fdo::DBusProxy::new(&conn).await {
+                    if let Ok(names) = dbus.list_names().await {
+                        if let Some(player) = names.iter().find(|n| n.as_str().starts_with("org.mpris.MediaPlayer2.")) {
+                            if let Ok(proxy) = zbus::Proxy::new(&conn, player.as_str(), "/org/mpris/MediaPlayer2", "org.mpris.MediaPlayer2.Player").await {
+                                let _ = match cmd {
+                                    MprisCmd::PlayPause => proxy.call::<_, _, ()>("PlayPause", &()).await,
+                                    MprisCmd::Stop => proxy.call::<_, _, ()>("Stop", &()).await,
+                                    MprisCmd::Next => proxy.call::<_, _, ()>("Next", &()).await,
+                                    MprisCmd::Previous => proxy.call::<_, _, ()>("Previous", &()).await,
+                                };
+                            }
+                        }
+                    }
+                }
             }
-        }
-    });
 
-    app.on_stop_clicked({
-        let handle = app_handle.clone();
-        move || {
-            if let Some(ui) = handle.upgrade() {
-                ui.set_is_playing(false);
-                info!("Playback stopped");
+            // Sync currently playing media from the first active player
+            if let Ok(dbus) = zbus::fdo::DBusProxy::new(&conn).await {
+                if let Ok(names) = dbus.list_names().await {
+                    let active_player = names.iter().find(|n| n.as_str().starts_with("org.mpris.MediaPlayer2."));
+                    
+                    if let Some(player_name) = active_player {
+                        if let Ok(proxy) = zbus::Proxy::new(&conn, player_name.as_str(), "/org/mpris/MediaPlayer2", "org.mpris.MediaPlayer2.Player").await {
+                            let status: String = proxy.get_property("PlaybackStatus").await.unwrap_or_default();
+                            let is_playing = status == "Playing";
+
+                            let meta: std::collections::HashMap<String, zbus::zvariant::OwnedValue> =
+                                proxy.get_property("Metadata").await.unwrap_or_default();
+
+                            let title = meta.get("xesam:title")
+                                .and_then(|v| String::try_from(v.clone()).ok())
+                                .unwrap_or_else(|| "No Media Title".into());
+
+                            let artist = meta.get("xesam:artist")
+                                .and_then(|v| {
+                                    <Vec<String>>::try_from(v.clone()).ok().map(|a| a.join(", "))
+                                        .or_else(|| String::try_from(v.clone()).ok())
+                                })
+                                .unwrap_or_else(|| player_name.as_str().replace("org.mpris.MediaPlayer2.", ""));
+
+                            if title != last_title || artist != last_artist || is_playing != last_status {
+                                last_title = title.clone();
+                                last_artist = artist.clone();
+                                last_status = is_playing;
+
+                                let handle = mpris_ui_handle.clone();
+                                let _ = slint::invoke_from_event_loop(move || {
+                                    if let Some(ui) = handle.upgrade() {
+                                        ui.set_track_title(title.into());
+                                        ui.set_track_artist(artist.into());
+                                        ui.set_is_playing(is_playing);
+                                    }
+                                });
+                            }
+                        }
+                    }
+                }
             }
-        }
-    });
 
-    app.on_prev_clicked({
-        let handle = app_handle.clone();
-        move || {
-            let _ = handle;
-            info!("Previous track requested");
-        }
-    });
-
-    app.on_next_clicked({
-        let handle = app_handle.clone();
-        move || {
-            let _ = handle;
-            info!("Next track requested");
+            tokio::time::sleep(tokio::time::Duration::from_millis(400)).await;
         }
     });
 
