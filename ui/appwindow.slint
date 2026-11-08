@@ -18,7 +18,7 @@ component IconButton inherits Rectangle {
         x: (parent.width - self.width) / 2;
         y: (parent.height - self.height) / 2;
         source: root.icon;
-        colorize: #ffffff;
+        image-fit: contain;
     }
 }
 
@@ -65,37 +65,28 @@ export component MainWindow inherits Window {
                 alignment: space-between;
 
                 IconButton {
-                    icon: @image-url("icons/prev.svg");
+                    icon: @image-url("icons/prev.png");
                     clicked => { root.prev-clicked(); }
                 }
 
                 IconButton {
-                    icon: @image-url("icons/play.svg");
+                    icon: @image-url("icons/play.png");
                     clicked => { root.play-clicked(); }
                 }
 
                 IconButton {
-                    icon: @image-url("icons/stop.svg");
+                    icon: @image-url("icons/stop.png");
                     clicked => { root.stop-clicked(); }
                 }
 
                 IconButton {
-                    icon: @image-url("icons/next.svg");
+                    icon: @image-url("icons/next.png");
                     clicked => { root.next-clicked(); }
                 }
 
                 // Divider
                 Rectangle {
-                    width: 1px;
-                    height: 20px;
-                    y: 10px;
-                    background: #3e3e3e;
-                }
-
-                IconButton {
-                    icon: @image-url("icons/menu.svg");
-                    clicked => { root.toggle-menu(); }
-                }
+                    width: 1
             }
 
             // Expanded Menu Section (Shows when menu-open == true)
