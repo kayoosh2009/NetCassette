@@ -152,18 +152,24 @@ export component MainWindow inherits Window {
                         // Reel window
                         HorizontalLayout {
                             alignment: space-around;
-                            vertical-alignment: center;
 
-                            SpoolWheel { active: root.is-playing; }
+                            SpoolWheel {
+                                y: (parent.height - self.height) / 2;
+                                active: root.is-playing;
+                            }
 
                             Text {
                                 text: root.is-playing ? "STREAMING" : root.stream-status;
                                 color: root.is-playing ? #4ade80 : #9a9ab0;
                                 font-size: 10px;
                                 font-weight: 600;
+                                vertical-alignment: center;
                             }
 
-                            SpoolWheel { active: root.is-playing; }
+                            SpoolWheel {
+                                y: (parent.height - self.height) / 2;
+                                active: root.is-playing;
+                            }
                         }
                     }
                 }
@@ -200,7 +206,6 @@ export component MainWindow inherits Window {
                 // Deck controls & peer counter
                 HorizontalLayout {
                     alignment: space-between;
-                    vertical-alignment: center;
 
                     // Play/Pause Deck Button
                     Rectangle {
