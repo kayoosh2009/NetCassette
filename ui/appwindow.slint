@@ -1,0 +1,155 @@
+import { Button, LineEdit, Slider } from "std-widgets.slint";
+
+component CassetteReel inherits Rectangle {
+    in property <bool> spinning: false;
+    width: 64px;
+    height: 64px;
+    border-radius: 32px;
+    background: #1e1e24;
+    border-width: 4px;
+    border-color: #4a4a58;
+
+    Rectangle {
+        width: 20px;
+        height: 20px;
+        border-radius: 10px;
+        background: #ffffff;
+    }
+
+    Rectangle {
+        width: 8px;
+        height: 48px;
+        background: #33333e;
+        border-radius: 2px;
+    }
+
+    Rectangle {
+        width: 48px;
+        height: 8px;
+        background: #33333e;
+        border-radius: 2px;
+    }
+}
+
+export component MainWindow inherits Window {
+    title: "NetCassette - P2P Streamer";
+    min-width: 620px;
+    min-height: 460px;
+    background: #121216;
+
+    in-out property <bool> is-playing: false;
+    in-out property <int> peer-count: 0;
+    in-out property <string> track-title: "No tape inserted";
+    in-out property <string> stream-status: "Offline";
+
+    callback toggle-playback();
+    callback connect-peer(string);
+
+    VerticalLayout {
+        padding: 24px;
+        spacing: 16px;
+
+        // P2P Network Header bar
+        HorizontalLayout {
+            spacing: 12px;
+            height: 36px;
+
+            peer-input := LineEdit {
+                placeholder-text: "Enter peer multiaddr or room hash...";
+                horizontal-stretch: 1;
+            }
+
+            Button {
+                text: "Connect";
+                clicked => { root.connect-peer(peer-input.text); }
+            }
+        }
+
+        // Cassette Shell
+        Rectangle {
+            background: #252530;
+            border-radius: 12px;
+            border-width: 2px;
+            border-color: #3b3b4d;
+            vertical-stretch: 1;
+
+            VerticalLayout {
+                padding: 18px;
+                spacing: 14px;
+
+                // Label area
+                Rectangle {
+                    height: 52px;
+                    background: #e6dfd3;
+                    border-radius: 4px;
+
+                    HorizontalLayout {
+                        padding-left: 14px;
+                        padding-right: 14px;
+                        Text {
+                            text: root.track-title;
+                            color: #1a1a1a;
+                            font-size: 16px;
+                            font-weight: 700;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
+
+                // Spool Viewport
+                Rectangle {
+                    background: #111115;
+                    border-radius: 8px;
+                    height: 120px;
+
+                    HorizontalLayout {
+                        alignment: space-around;
+                        padding: 16px;
+
+                        CassetteReel { spinning: root.is-playing; }
+
+                        VerticalLayout {
+                            alignment: center;
+                            spacing: 4px;
+                            Text {
+                                text: root.stream-status;
+                                color: #8e8e9f;
+                                font-size: 12px;
+                                horizontal-alignment: center;
+                            }
+                            Text {
+                                text: "Peers: " + root.peer-count;
+                                color: root.peer-count > 0 ? #4ade80 : #f87171;
+                                font-size: 13px;
+                                font-weight: 600;
+                                horizontal-alignment: center;
+                            }
+                        }
+
+                        CassetteReel { spinning: root.is-playing; }
+                    }
+                }
+            }
+        }
+
+        // Playback Deck Controls
+        HorizontalLayout {
+            spacing: 12px;
+            alignment: center;
+
+            Button {
+                text: root.is-playing ? "Pause" : "Play";
+                clicked => { root.toggle-playback(); }
+            }
+
+            Button {
+                text: "Eject / Reset";
+                clicked => {
+                    root.is-playing = false;
+                    root.track-title = "Ejected";
+                    root.stream-status = "Idle";
+                }
+            }
+        }
+    }
+}
