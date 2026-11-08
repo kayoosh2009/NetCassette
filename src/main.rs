@@ -113,15 +113,28 @@ async fn main() -> Result<(), Box<dyn Error>> {
                             let meta: std::collections::HashMap<String, zbus::zvariant::OwnedValue> =
                                 proxy.get_property("Metadata").await.unwrap_or_default();
 
-                            let title = meta.get("xesam:title")
-                                .and_then(|v| String::try_from(v.clone()).ok())
+                            use std::ops::Deref;
+                            let extract_meta = |key: &str| -> Option<String> {
+                                match meta.get(key)?.deref() {
+                                    zbus::zvariant::Value::Str(s) => Some(s.as_str().to_string()),
+                                    zbus::zvariant::Value::Array(arr) => {
+                                        let items: Vec<String> = arr.iter().filter_map(|item| {
+                                            if let zbus::zvariant::Value::Str(s) = item {
+                                                Some(s.as_str().to_string())
+                                            } else {
+                                                None
+                                            }
+                                        }).collect();
+                                        if items.is_empty() { None } else { Some(items.join(", ")) }
+                                    }
+                                    _ => None,
+                                }
+                            };
+
+                            let title = extract_meta("xesam:title")
                                 .unwrap_or_else(|| "No Media Title".into());
 
-                            let artist = meta.get("xesam:artist")
-                                .and_then(|v| {
-                                    <Vec<String>>::try_from(v.clone()).ok().map(|a| a.join(", "))
-                                        .or_else(|| String::try_from(v.clone()).ok())
-                                })
+                            let artist = extract_meta("xesam:artist")
                                 .unwrap_or_else(|| player_name.as_str().replace("org.mpris.MediaPlayer2.", ""));
 
                             if title != last_title || artist != last_artist || is_playing != last_status {
