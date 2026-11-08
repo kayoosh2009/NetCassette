@@ -65,6 +65,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     });
 
+    app.on_minimize_clicked({
+        let handle = app_handle.clone();
+        move || {
+            if let Some(ui) = handle.upgrade() {
+                ui.window().set_minimized(true);
+                info!("Window minimized ( ˘ω˘ )");
+            }
+        }
+    });
+
+    app.on_close_clicked({
+        move || {
+            info!("Shutting down NetCassette... ( ﾟヮﾟ)ﾉ");
+            std::process::exit(0);
+        }
+    });
+
     app.run()?;
     Ok(())
 }
