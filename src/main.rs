@@ -12,50 +12,55 @@ async fn main() -> Result<(), Box<dyn Error>> {
     tracing::subscriber::set_global_default(subscriber)
         .expect("Failed to initialize tracing logger");
 
-    info!("NetCassette edge-dock widget launching... (｡•̀ᴗ-)✧");
+    info!("NetCassette mini-bar starting... (b ᵔ▽ᵔ)b");
 
     let app = MainWindow::new()?;
     let app_handle = app.as_weak();
 
-    // Toggle playback action
-    app.on_toggle_playback({
+    app.on_play_clicked({
         let handle = app_handle.clone();
         move || {
             if let Some(ui) = handle.upgrade() {
                 let next = !ui.get_is_playing();
                 ui.set_is_playing(next);
-                ui.set_stream_status(if next { "Live".into() } else { "Paused".into() });
-                info!(playback = next, "Playback state changed");
+                info!(playing = next, "Play / Pause clicked");
             }
         }
     });
 
-    // Swarm join action
-    app.on_connect_peer({
-        let handle = app_handle.clone();
-        move |room: slint::SharedString| {
-            let room_id = room.to_string();
-            if room_id.trim().is_empty() {
-                return;
-            }
-
-            info!(swarm_room = %room_id, "Joining tape swarm");
-            if let Some(ui) = handle.upgrade() {
-                ui.set_stream_status("Syncing...".into());
-                ui.set_track_title(format!("Cassette #{}", &room_id[..room_id.len().min(8)]).into());
-                ui.set_peer_count(1);
-            }
-        }
-    });
-
-    // Close button action
-    app.on_close_widget({
+    app.on_stop_clicked({
         let handle = app_handle.clone();
         move || {
             if let Some(ui) = handle.upgrade() {
-                let _ = ui.hide();
-                info!("Widget dismissed by user (˘ω˘)");
-                std::process::exit(0);
+                ui.set_is_playing(false);
+                info!("Playback stopped");
+            }
+        }
+    });
+
+    app.on_prev_clicked({
+        let handle = app_handle.clone();
+        move || {
+            let _ = handle;
+            info!("Previous track requested");
+        }
+    });
+
+    app.on_next_clicked({
+        let handle = app_handle.clone();
+        move || {
+            let _ = handle;
+            info!("Next track requested");
+        }
+    });
+
+    app.on_toggle_menu({
+        let handle = app_handle.clone();
+        move || {
+            if let Some(ui) = handle.upgrade() {
+                let open = !ui.get_menu_open();
+                ui.set_menu_open(open);
+                info!(menu_open = open, "Menu toggled");
             }
         }
     });
