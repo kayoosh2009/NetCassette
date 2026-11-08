@@ -47,11 +47,13 @@ export component MainWindow inherits Window {
     callback next-clicked();
     callback prev-clicked();
     callback toggle-menu();
+    callback hover-changed(bool);
 
     // Hover sensor covering the full viewport
     hover-sensor := TouchArea {
         width: 100%;
         height: 100%;
+        moved => { root.hover-changed(self.has-hover); }
     }
 
     // Sliding drawer panel

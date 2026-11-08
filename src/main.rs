@@ -6,10 +6,8 @@ use tracing_subscriber::FmtSubscriber;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
-    // Force X11/XWayland backend so KDE KWin allows custom window positioning
-    if std::env::var("WINIT_UNIX_BACKEND").is_err() {
-        std::env::set_var("WINIT_UNIX_BACKEND", "x11");
-    }
+    let session_type = std::env::var("XDG_SESSION_TYPE").unwrap_or_else(|_| "unknown".into());
+    let wayland_display = std::env::var("WAYLAND_DISPLAY").unwrap_or_else(|_| "none".into());
 
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::INFO)
@@ -17,10 +15,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
     tracing::subscriber::set_global_default(subscriber)
         .expect("Failed to initialize tracing logger");
 
-    info!("NetCassette KDE docking engine starting... (ง •̀_•́)ง");
+    info!(session = %session_type, wayland = %wayland_display, "Inspecting Linux display environment (⊙_⊙)");
+
+    // Force X11/XWayland backend so KDE KWin allows custom window positioning
+    if std::env::var("WINIT_UNIX_BACKEND").is_err() {
+        std::env::set_var("WINIT_UNIX_BACKEND", "x11");
+    }
 
     let app = MainWindow::new()?;
     let app_handle = app.as_weak();
+
+    // Hover sensor logger
+    app.on_hover_changed({
+        move |is_hovered| {
+            info!(is_hovered, "Widget hover state changed (•‿•)");
+        }
+    });
 
     app.on_play_clicked({
         let handle = app_handle.clone();
@@ -94,11 +104,28 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Dock firmly into KDE right corner right after window is registered
     let dock_handle = app_handle.clone();
-    slint::Timer::single_shot(std::time::Duration::from_millis(50), move || {
+    slint::Timer::single_shot(std::time::Duration::from_millis(150), move || {
         if let Some(ui) = dock_handle.upgrade() {
             let target_x = screen_width - 360.0;
-            ui.window().set_position(slint::LogicalPosition::new(target_x, 0.0));
-            info!(target_x, "KDE KWin window pinned flush to top-right corner (✧ω✧)");
+            let target_y = 0.0;
+
+            let pos_before = ui.window().position();
+            info!(?pos_before, "Window position before set_position request");
+
+            ui.window().set_position(slint::LogicalPosition::new(target_x, target_y));
+
+            let pos_after = ui.window().position();
+            info!(?pos_after, target_x, target_y, "Window position after set_position request");
+
+            // If KWin ignored Winit set_position, try kdotool / xdotool
+            if let Some(actual) = pos_after {
+                if (actual.x as f32 - target_x).abs() > 50.0 {
+                    info!("KWin ignored standard positioning, attempting xdotool fallback... (¬_¬)");
+                    let _ = std::process::Command::new("xdotool")
+                        .args(["search", "--name", "NetCassette", "windowmove", &target_x.to_string(), "0"])
+                        .status();
+                }
+            }
         }
     });
 
