@@ -82,10 +82,19 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     let window_width = 360.0;
     let target_x = screen_width - window_width;
-    let target_y = 60.0;
+    let target_y = 0.0;
 
     app.window().set_position(slint::LogicalPosition::new(target_x, target_y));
-    info!(target_x, target_y, "Docked window to top-right screen corner ヽ(>∀<☆)ノ");
+    info!(target_x, target_y, "Docked flush against top-right corner ヽ(>∀<☆)ノ");
+
+    // Show on launch, then smoothly tuck away into the edge
+    let timer_handle = app_handle.clone();
+    slint::Timer::single_shot(std::time::Duration::from_millis(2500), move || {
+        if let Some(ui) = timer_handle.upgrade() {
+            ui.set_initial_reveal(false);
+            info!("Initial welcome reveal ended: tucked into right edge (˘ω˘)");
+        }
+    });
 
     app.run()?;
     Ok(())

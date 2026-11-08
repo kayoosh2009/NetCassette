@@ -37,6 +37,7 @@ export component MainWindow inherits Window {
 
     in-out property <bool> is-playing: false;
     in-out property <bool> menu-open: false;
+    in-out property <bool> initial-reveal: true;
     in-out property <string> track-title: "No Media Loaded";
     in-out property <string> track-artist: "Ready";
     in-out property <image> track-cover: @image-url("icons/play.png");
@@ -55,7 +56,7 @@ export component MainWindow inherits Window {
 
     // Sliding drawer panel
     card := Rectangle {
-        x: (hover-sensor.has-hover || root.menu-open) ? 0px : (root.width - 8px);
+        x: (hover-sensor.has-hover || root.menu-open || root.initial-reveal) ? 0px : (root.width - 8px);
         y: 0px;
         width: root.width;
         height: root.height;
