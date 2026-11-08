@@ -137,12 +137,29 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     });
 
-    // Show initially for 2.5s, then hide into edge
-    let timer_handle = app_handle.clone();
-    slint::Timer::single_shot(std::time::Duration::from_millis(2500), move || {
-        if let Some(ui) = timer_handle.upgrade() {
-            ui.set_initial_reveal(false);
-            info!("Initial welcome reveal ended: tucked into right edge (˘ω˘)");
+    // 7-second cooldown auto-hide controller
+    use std::sync::{Arc, Mutex};
+    use std::time::{Duration, Instant};
+
+    let last_hover_time = Arc::new(Mutex::new(Instant::now()));
+    let hover_track = last_hover_time.clone();
+    let auto_hide_handle = app_handle.clone();
+
+    let auto_hide_timer = slint::Timer::default();
+    auto_hide_timer.start(slint::TimerMode::Repeated, Duration::from_millis(150), move || {
+        if let Some(ui) = auto_hide_handle.upgrade() {
+            let is_hovered = ui.get_has_hover();
+            let mut last_seen = hover_track.lock().unwrap();
+
+            if is_hovered {
+                *last_seen = Instant::now();
+                if !ui.get_is_revealed() {
+                    ui.set_is_revealed(true);
+                }
+            } else if ui.get_is_revealed() && last_seen.elapsed() >= Duration::from_secs(7) {
+                ui.set_is_revealed(false);
+                info!("7 seconds cooldown elapsed: tucked into edge dock (˘ω˘)");
+            }
         }
     });
 
