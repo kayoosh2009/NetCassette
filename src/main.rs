@@ -12,53 +12,54 @@ async fn main() -> Result<(), Box<dyn Error>> {
     tracing::subscriber::set_global_default(subscriber)
         .expect("Failed to initialize tracing logger");
 
-    info!("Starting NetCassette P2P audio node...");
+    info!("NetCassette edge-dock widget launching... (｡•̀ᴗ-)✧");
 
     let app = MainWindow::new()?;
     let app_handle = app.as_weak();
 
-    // Toggle playback event handler
+    // Toggle playback action
     app.on_toggle_playback({
         let handle = app_handle.clone();
         move || {
             if let Some(ui) = handle.upgrade() {
-                let current_state = ui.get_is_playing();
-                let next_state = !current_state;
-                ui.set_is_playing(next_state);
-                
-                if next_state {
-                    ui.set_stream_status("Buffering swarm...".into());
-                    info!("Playback requested: starting stream pipelines");
-                } else {
-                    ui.set_stream_status("Paused".into());
-                    info!("Playback paused");
-                }
+                let next = !ui.get_is_playing();
+                ui.set_is_playing(next);
+                ui.set_stream_status(if next { "Live".into() } else { "Paused".into() });
+                info!(playback = next, "Playback state changed");
             }
         }
     });
 
-    // P2P swarm connect event handler
+    // Swarm join action
     app.on_connect_peer({
         let handle = app_handle.clone();
-        move |target: slint::SharedString| {
-            let target_str = target.to_string();
-            if target_str.trim().is_empty() {
+        move |room: slint::SharedString| {
+            let room_id = room.to_string();
+            if room_id.trim().is_empty() {
                 return;
             }
 
-            info!(target = %target_str, "Connection command received from UI");
-            
+            info!(swarm_room = %room_id, "Joining tape swarm");
             if let Some(ui) = handle.upgrade() {
-                ui.set_stream_status("Connecting to peer swarm...".into());
-                // Dummy feedback before real P2P driver is wired
-                ui.set_peer_count(ui.get_peer_count() + 1);
-                ui.set_track_title(format!("Tape Stream [{}]", &target_str[..target_str.len().min(12)]).into());
+                ui.set_stream_status("Syncing...".into());
+                ui.set_track_title(format!("Cassette #{}", &room_id[..room_id.len().min(8)]).into());
+                ui.set_peer_count(1);
+            }
+        }
+    });
+
+    // Close button action
+    app.on_close_widget({
+        let handle = app_handle.clone();
+        move || {
+            if let Some(ui) = handle.upgrade() {
+                let _ = ui.hide();
+                info!("Widget dismissed by user (˘ω˘)");
+                std::process::exit(0);
             }
         }
     });
 
     app.run()?;
-    info!("NetCassette shutdown gracefully (─‿‿─)");
-
     Ok(())
 }

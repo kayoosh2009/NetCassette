@@ -1,153 +1,233 @@
-import { Button, LineEdit, Slider } from "std-widgets.slint";
+import { LineEdit } from "std-widgets.slint";
 
-component CassetteReel inherits Rectangle {
-    in property <bool> spinning: false;
-    width: 64px;
-    height: 64px;
-    border-radius: 32px;
-    background: #1e1e24;
-    border-width: 4px;
-    border-color: #4a4a58;
+component SpoolWheel inherits Rectangle {
+    in property <bool> active: false;
+    width: 32px;
+    height: 32px;
+    border-radius: 16px;
+    background: #18181f;
+    border-width: 2px;
+    border-color: #525266;
 
     Rectangle {
-        width: 20px;
-        height: 20px;
-        border-radius: 10px;
+        width: 10px;
+        height: 10px;
+        border-radius: 5px;
         background: #ffffff;
     }
 
     Rectangle {
-        width: 8px;
-        height: 48px;
-        background: #33333e;
-        border-radius: 2px;
+        width: 4px;
+        height: 24px;
+        background: #393946;
+        border-radius: 1px;
     }
 
     Rectangle {
-        width: 48px;
-        height: 8px;
-        background: #33333e;
-        border-radius: 2px;
+        width: 24px;
+        height: 4px;
+        background: #393946;
+        border-radius: 1px;
     }
 }
 
 export component MainWindow inherits Window {
-    title: "NetCassette - P2P Streamer";
-    min-width: 620px;
-    min-height: 460px;
-    background: #121216;
+    title: "NetCassette Widget";
+    no-frame: true;
+    background: transparent;
+    always-on-top: true;
+    width: 380px;
+    height: 280px;
 
     in-out property <bool> is-playing: false;
     in-out property <int> peer-count: 0;
-    in-out property <string> track-title: "No tape inserted";
-    in-out property <string> stream-status: "Offline";
+    in-out property <string> track-title: "Swarm Idle";
+    in-out property <string> stream-status: "Ready";
+    in-out property <bool> is-expanded: hover-zone.has-hover || panel-zone.has-hover;
 
     callback toggle-playback();
     callback connect-peer(string);
+    callback close-widget();
 
-    VerticalLayout {
-        padding: 24px;
-        spacing: 16px;
+    // Hot-edge trigger zone on the far right
+    hover-zone := TouchArea {
+        x: root.width - 20px;
+        y: 0px;
+        width: 20px;
+        height: root.height;
+    }
 
-        // P2P Network Header bar
-        HorizontalLayout {
-            spacing: 12px;
-            height: 36px;
+    // Main sliding card body
+    panel-zone := TouchArea {
+        x: root.is-expanded ? (root.width - 360px) : (root.width - 16px);
+        y: 10px;
+        width: 360px;
+        height: 260px;
 
-            peer-input := LineEdit {
-                placeholder-text: "Enter peer multiaddr or room hash...";
-                horizontal-stretch: 1;
-            }
-
-            Button {
-                text: "Connect";
-                clicked => { root.connect-peer(peer-input.text); }
-            }
+        animate x {
+            duration: 250ms;
+            easing: ease-out;
         }
 
-        // Cassette Shell
         Rectangle {
-            background: #252530;
-            border-radius: 12px;
-            border-width: 2px;
-            border-color: #3b3b4d;
-            vertical-stretch: 1;
+            background: #141419;
+            border-radius: 14px;
+            border-width: 1.5px;
+            border-color: #ff8838;
+            clip: true;
+
+            // Cassette side tab visible when collapsed
+            Rectangle {
+                x: 0px;
+                y: 0px;
+                width: 6px;
+                height: parent.height;
+                background: #ff8838;
+            }
 
             VerticalLayout {
-                padding: 18px;
-                spacing: 14px;
+                padding-top: 14px;
+                padding-bottom: 14px;
+                padding-left: 20px;
+                padding-right: 16px;
+                spacing: 10px;
 
-                // Label area
-                Rectangle {
-                    height: 52px;
-                    background: #e6dfd3;
-                    border-radius: 4px;
+                // Title bar
+                HorizontalLayout {
+                    alignment: space-between;
+                    height: 22px;
 
-                    HorizontalLayout {
-                        padding-left: 14px;
-                        padding-right: 14px;
+                    Text {
+                        text: "NETCASSETTE // P2P";
+                        color: #ff8838;
+                        font-size: 11px;
+                        font-weight: 800;
+                        letter-spacing: 1.5px;
+                        vertical-alignment: center;
+                    }
+
+                    TouchArea {
+                        width: 22px;
+                        height: 22px;
+                        clicked => { root.close-widget(); }
                         Text {
-                            text: root.track-title;
-                            color: #1a1a1a;
-                            font-size: 16px;
-                            font-weight: 700;
+                            text: "×";
+                            color: #727282;
+                            font-size: 18px;
+                            horizontal-alignment: center;
                             vertical-alignment: center;
                         }
                     }
                 }
 
-                // Spool Viewport
+                // Compact cassette viewport
                 Rectangle {
-                    background: #111115;
+                    height: 78px;
+                    background: #1d1d26;
                     border-radius: 8px;
-                    height: 120px;
+                    border-width: 1px;
+                    border-color: #2b2b38;
 
-                    HorizontalLayout {
-                        alignment: space-around;
-                        padding: 16px;
+                    VerticalLayout {
+                        padding: 8px;
+                        spacing: 6px;
 
-                        CassetteReel { spinning: root.is-playing; }
+                        // Sticker label
+                        Rectangle {
+                            height: 22px;
+                            background: #f1ebd9;
+                            border-radius: 3px;
+                            clip: true;
 
-                        VerticalLayout {
-                            alignment: center;
-                            spacing: 4px;
                             Text {
-                                text: root.stream-status;
-                                color: #8e8e9f;
-                                font-size: 12px;
+                                text: root.track-title;
+                                color: #151515;
+                                font-size: 11px;
+                                font-weight: 700;
                                 horizontal-alignment: center;
-                            }
-                            Text {
-                                text: "Peers: " + root.peer-count;
-                                color: root.peer-count > 0 ? #4ade80 : #f87171;
-                                font-size: 13px;
-                                font-weight: 600;
-                                horizontal-alignment: center;
+                                vertical-alignment: center;
                             }
                         }
 
-                        CassetteReel { spinning: root.is-playing; }
+                        // Reel window
+                        HorizontalLayout {
+                            alignment: space-around;
+                            vertical-alignment: center;
+
+                            SpoolWheel { active: root.is-playing; }
+
+                            Text {
+                                text: root.is-playing ? "STREAMING" : root.stream-status;
+                                color: root.is-playing ? #4ade80 : #9a9ab0;
+                                font-size: 10px;
+                                font-weight: 600;
+                            }
+
+                            SpoolWheel { active: root.is-playing; }
+                        }
                     }
                 }
-            }
-        }
 
-        // Playback Deck Controls
-        HorizontalLayout {
-            spacing: 12px;
-            alignment: center;
+                // Swarm room connection input
+                HorizontalLayout {
+                    spacing: 8px;
+                    height: 30px;
 
-            Button {
-                text: root.is-playing ? "Pause" : "Play";
-                clicked => { root.toggle-playback(); }
-            }
+                    input := LineEdit {
+                        placeholder-text: "Room ID / Peer...";
+                        horizontal-stretch: 1;
+                    }
 
-            Button {
-                text: "Eject / Reset";
-                clicked => {
-                    root.is-playing = false;
-                    root.track-title = "Ejected";
-                    root.stream-status = "Idle";
+                    Rectangle {
+                        width: 70px;
+                        background: #ff8838;
+                        border-radius: 4px;
+
+                        TouchArea {
+                            clicked => { root.connect-peer(input.text); }
+                            Text {
+                                text: "JOIN";
+                                color: #111115;
+                                font-size: 11px;
+                                font-weight: 800;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+                }
+
+                // Deck controls & peer counter
+                HorizontalLayout {
+                    alignment: space-between;
+                    vertical-alignment: center;
+
+                    // Play/Pause Deck Button
+                    Rectangle {
+                        width: 100px;
+                        height: 32px;
+                        background: root.is-playing ? #f43f5e : #22c55e;
+                        border-radius: 6px;
+
+                        TouchArea {
+                            clicked => { root.toggle-playback(); }
+                            Text {
+                                text: root.is-playing ? "PAUSE" : "PLAY";
+                                color: #ffffff;
+                                font-size: 11px;
+                                font-weight: 700;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
+                        }
+                    }
+
+                    Text {
+                        text: "● " + root.peer-count + " peers";
+                        color: root.peer-count > 0 ? #4ade80 : #71717a;
+                        font-size: 11px;
+                        font-weight: 600;
+                    }
                 }
             }
         }
