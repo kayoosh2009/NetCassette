@@ -6,13 +6,18 @@ use tracing_subscriber::FmtSubscriber;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    // Force X11/XWayland backend so KDE KWin allows custom window positioning
+    if std::env::var("WINIT_UNIX_BACKEND").is_err() {
+        std::env::set_var("WINIT_UNIX_BACKEND", "x11");
+    }
+
     let subscriber = FmtSubscriber::builder()
         .with_max_level(Level::INFO)
         .finish();
     tracing::subscriber::set_global_default(subscriber)
         .expect("Failed to initialize tracing logger");
 
-    info!("NetCassette mini-bar starting... (b ᵔ▽ᵔ)b");
+    info!("NetCassette KDE docking engine starting... (ง •̀_•́)ง");
 
     let app = MainWindow::new()?;
     let app_handle = app.as_weak();
@@ -65,29 +70,39 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     });
 
-    // Detect screen width under Linux and dock window to the right corner
-    let screen_width = std::fs::read_dir("/sys/class/drm")
+    // Detect screen resolution using xrandr / drm
+    let screen_width = std::process::Command::new("xrandr")
+        .output()
         .ok()
-        .and_then(|mut entries| {
-            entries.find_map(|entry| {
-                let path = entry.ok()?.path().join("modes");
-                let content = std::fs::read_to_string(path).ok()?;
-                let first_mode = content.lines().next()?;
-                let mut parts = first_mode.split('x');
-                let w: f32 = parts.next()?.parse().ok()?;
+        .and_then(|out| {
+            let s = String::from_utf8_lossy(&out.stdout);
+            s.lines().find(|l| l.contains(" connected primary") || l.contains(" connected")).and_then(|l| {
+                let chunk = l.split_whitespace().find(|w| w.contains('x') && w.contains('+'))?;
+                let res = chunk.split('+').next()?;
+                let w = res.split('x').next()?.parse::<f32>().ok()?;
                 Some(w)
+            })
+        })
+        .or_else(|| {
+            std::fs::read_dir("/sys/class/drm").ok()?.find_map(|e| {
+                let content = std::fs::read_to_string(e.ok()?.path().join("modes")).ok()?;
+                let first = content.lines().next()?;
+                first.split('x').next()?.parse::<f32>().ok()
             })
         })
         .unwrap_or(1920.0);
 
-    let window_width = 360.0;
-    let target_x = screen_width - window_width;
-    let target_y = 0.0;
+    // Dock firmly into KDE right corner right after window is registered
+    let dock_handle = app_handle.clone();
+    slint::Timer::single_shot(std::time::Duration::from_millis(50), move || {
+        if let Some(ui) = dock_handle.upgrade() {
+            let target_x = screen_width - 360.0;
+            ui.window().set_position(slint::LogicalPosition::new(target_x, 0.0));
+            info!(target_x, "KDE KWin window pinned flush to top-right corner (✧ω✧)");
+        }
+    });
 
-    app.window().set_position(slint::LogicalPosition::new(target_x, target_y));
-    info!(target_x, target_y, "Docked flush against top-right corner ヽ(>∀<☆)ノ");
-
-    // Show on launch, then smoothly tuck away into the edge
+    // Show initially for 2.5s, then hide into edge
     let timer_handle = app_handle.clone();
     slint::Timer::single_shot(std::time::Duration::from_millis(2500), move || {
         if let Some(ui) = timer_handle.upgrade() {
