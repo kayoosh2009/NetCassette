@@ -31,6 +31,7 @@ export component PlaylistWindow inherits Window {
     in-out property <string> track-title: "No Media Loaded";
     in-out property <string> track-artist: "Ready";
     in-out property <bool> is-playing: false;
+    in-out property <image> track-cover: @image-url("icons/play.png");
 
     callback close-clicked();
     callback play-clicked();
@@ -101,9 +102,28 @@ export component PlaylistWindow inherits Window {
                 border-color: #2b2b2b;
 
                 HorizontalLayout {
-                    padding-left: 14px;
+                    padding-left: 10px;
                     padding-right: 12px;
                     spacing: 12px;
+
+                    // Обложка 1:1
+                    Rectangle {
+                        width: 38px;
+                        height: 38px;
+                        y: (parent.height - self.height) / 2;
+                        border-radius: 6px;
+                        border-width: 1px;
+                        border-color: #333333;
+                        background: #202020;
+                        clip: true;
+
+                        Image {
+                            width: 100%;
+                            height: 100%;
+                            source: root.track-cover;
+                            image-fit: cover;
+                        }
+                    }
 
                     // Что сейчас играет
                     VerticalLayout {

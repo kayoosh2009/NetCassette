@@ -280,20 +280,23 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                 let title_for_pl = title.clone();
                                 let artist_for_pl = artist.clone();
                                 let _ = slint::invoke_from_event_loop(move || {
+                                    let img = cover_path.as_ref().and_then(|p| slint::Image::load_from_path(p).ok());
+
                                     if let Some(ui) = handle.upgrade() {
                                         ui.set_track_title(title.into());
                                         ui.set_track_artist(artist.into());
                                         ui.set_is_playing(is_playing);
-                                        if let Some(path) = cover_path {
-                                            if let Ok(img) = slint::Image::load_from_path(&path) {
-                                                ui.set_track_cover(img);
-                                            }
+                                        if let Some(ref cover) = img {
+                                            ui.set_track_cover(cover.clone());
                                         }
                                     }
                                     if let Some(pl) = pl_sync_handle.upgrade() {
                                         pl.set_track_title(title_for_pl.into());
                                         pl.set_track_artist(artist_for_pl.into());
                                         pl.set_is_playing(is_playing);
+                                        if let Some(ref cover) = img {
+                                            pl.set_track_cover(cover.clone());
+                                        }
                                     }
                                 });
                             }
