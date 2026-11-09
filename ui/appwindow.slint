@@ -137,7 +137,7 @@ export component MainWindow inherits Window {
                     }
                 }
 
-                // Center Song Cover / Info Viewport
+                // Center Song Cover / Info Viewport with Full Artwork Background
                 Rectangle {
                     background: #1c1c1c;
                     border-radius: 10px;
@@ -146,18 +146,22 @@ export component MainWindow inherits Window {
                     vertical-stretch: 1;
                     clip: true;
 
+                    // Full Cover Background Image
                     Image {
-                        width: 64px;
-                        height: 64px;
-                        x: (parent.width - self.width) / 2;
-                        y: (parent.height - self.height) / 2 - 14px;
+                        width: 100%;
+                        height: 100%;
                         source: root.track-cover;
-                        image-fit: contain;
+                        image-fit: cover;
+                    }
+
+                    // Dark gradient scrim for text readability
+                    Rectangle {
+                        background: @linear-gradient(180deg, rgba(18, 18, 22, 0.25) 0%, rgba(14, 14, 18, 0.88) 100%);
                     }
 
                     VerticalLayout {
                         alignment: end;
-                        padding-bottom: 10px;
+                        padding-bottom: 12px;
                         padding-left: 12px;
                         padding-right: 12px;
                         spacing: 2px;
@@ -173,7 +177,7 @@ export component MainWindow inherits Window {
 
                         Text {
                             text: root.track-artist;
-                            color: #888888;
+                            color: #cccccc;
                             font-size: 11px;
                             horizontal-alignment: center;
                             overflow: elide;
@@ -191,14 +195,10 @@ export component MainWindow inherits Window {
                         clicked => { root.prev-clicked(); }
                     }
 
+                    // Dynamic Play / Stop Toggle Button
                     IconButton {
-                        icon: @image-url("icons/play.png");
+                        icon: root.is-playing ? @image-url("icons/stop.png") : @image-url("icons/play.png");
                         clicked => { root.play-clicked(); }
-                    }
-
-                    IconButton {
-                        icon: @image-url("icons/stop.png");
-                        clicked => { root.stop-clicked(); }
                     }
 
                     IconButton {
