@@ -32,7 +32,52 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     });
 
-    // Fluid LMB vertical slide handler (keeps X docked, adjusts Y)
+    // Persistent configuration structure
+    #[derive(serde::Serialize, serde::Deserialize, Clone)]
+    struct AppConfig {
+        y: f32,
+        width: f32,
+        height: f32,
+    }
+
+    impl Default for AppConfig {
+        fn default() -> Self {
+            Self { y: 20.0, width: 360.0, height: 270.0 }
+        }
+    }
+
+    let config_dir = directories::BaseDirs::new()
+        .map(|b| b.config_dir().join("netcassette"))
+        .unwrap_or_else(|| std::path::PathBuf::from("."));
+    let _ = std::fs::create_dir_all(&config_dir);
+    let config_path = config_dir.join("config.json");
+
+    let saved_config: AppConfig = std::fs::read_to_string(&config_path)
+        .ok()
+        .and_then(|data| serde_json::from_str(&data).ok())
+        .unwrap_or_default();
+
+    let config_state = std::sync::Arc::new(std::sync::Mutex::new(saved_config.clone()));
+
+    // Apply saved dimensions to UI
+    app.set_base_width(saved_config.width);
+    app.set_base_height(saved_config.height);
+
+    let save_cfg = {
+        let path = config_path.clone();
+        let state = config_state.clone();
+        move || {
+            if let Ok(cfg) = state.lock() {
+                if let Ok(data) = serde_json::to_string_pretty(&*cfg) {
+                    let _ = std::fs::write(&path, data);
+                }
+            }
+        }
+    };
+
+    // Fluid LMB vertical slide handler with persistent Y saving
+    let save_on_move = save_cfg.clone();
+    let state_on_move = config_state.clone();
     app.on_move_window_y({
         let handle = app_handle.clone();
         move |dy| {
@@ -40,6 +85,41 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 let current_pos = ui.window().position();
                 let next_y = (current_pos.y + dy as i32).max(0);
                 ui.window().set_position(slint::PhysicalPosition::new(current_pos.x, next_y));
+
+                if let Ok(mut cfg) = state_on_move.lock() {
+                    cfg.y = next_y as f32;
+                }
+                save_on_move();
+            }
+        }
+    });
+
+    // Dynamic corner resizing handler (adjusts dimensions and re-anchors to right screen edge)
+    let save_on_resize = save_cfg.clone();
+    let state_on_resize = config_state.clone();
+    app.on_resize_window({
+        let handle = app_handle.clone();
+        move |dw, dh| {
+            if let Some(ui) = handle.upgrade() {
+                let cur_w = ui.get_base_width();
+                let cur_h = ui.get_base_height();
+
+                let new_w = (cur_w + dw).max(280.0).min(650.0);
+                let new_h = (cur_h + dh).max(200.0).min(750.0);
+
+                ui.set_base_width(new_w);
+                ui.set_base_height(new_h);
+
+                // Re-anchor to right edge with new width
+                let pos = ui.window().position();
+                let new_x = screen_width - new_w;
+                ui.window().set_position(slint::PhysicalPosition::new(new_x as i32, pos.y));
+
+                if let Ok(mut cfg) = state_on_resize.lock() {
+                    cfg.width = new_w;
+                    cfg.height = new_h;
+                }
+                save_on_resize();
             }
         }
     });
@@ -271,12 +351,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Apply rules with retry to catch the X11 surface right when KWin maps it
     let dock_handle = app_handle.clone();
+    let initial_y = saved_config.y;
+    let initial_w = saved_config.width;
     slint::Timer::single_shot(std::time::Duration::from_millis(100), move || {
         if let Some(ui) = dock_handle.upgrade() {
-            let target_x = screen_width - 360.0;
-            ui.window().set_position(slint::LogicalPosition::new(target_x, 0.0));
+            let target_x = screen_width - initial_w;
+            ui.window().set_position(slint::LogicalPosition::new(target_x, initial_y));
             apply_kde_dock_rules();
-            info!("KDE Dock rules applied: stripped from panel and pinned on top (ﾉ´ヮ`)ﾉ*: ･ﾟ");
+            info!(target_x, initial_y, "KDE Dock restored at saved height (ﾉ´ヮ`)ﾉ*: ･ﾟ");
         }
     });
 
