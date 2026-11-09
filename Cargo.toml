@@ -1,6 +1,6 @@
 [package]
 name = "netcassette"
-version = "1.0.2"
+version = "1.0.3"
 edition = "2021"
 authors = ["NetCassette Team"]
 description = "Сетевой плеер и менеджер аудиопотоков в ретро-стиле кассетника"
