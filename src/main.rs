@@ -347,6 +347,16 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     });
 
+    // Открытие папки музыки в проводнике KDE / Dolphin
+    playlist_win.on_open_music_folder_clicked(|| {
+        let music_dir = directories::UserDirs::new()
+            .and_then(|u| u.audio_dir().map(|p| p.join("NetCassette")))
+            .unwrap_or_else(|| std::path::PathBuf::from("./music"));
+        let _ = std::fs::create_dir_all(&music_dir);
+        let _ = std::process::Command::new("xdg-open").arg(&music_dir).spawn();
+        info!("Opened NetCassette music folder (•‿•)");
+    });
+
     // Кнопки управления треком из окна плейлиста
     let tx_pl_play = cmd_tx.clone();
     playlist_win.on_play_clicked(move || {

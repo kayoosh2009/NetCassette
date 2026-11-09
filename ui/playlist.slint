@@ -21,6 +21,43 @@ component MiniControlBtn inherits Rectangle {
     }
 }
 
+component NavItem inherits Rectangle {
+    in property <image> icon;
+    in property <string> label;
+    in property <bool> is-active: false;
+    callback clicked();
+
+    height: 36px;
+    border-radius: 7px;
+    background: root.is-active ? #2a2a2e : (nav-touch.has-hover ? #222225 : transparent);
+
+    nav-touch := TouchArea {
+        clicked => { root.clicked(); }
+    }
+
+    HorizontalLayout {
+        padding-left: 10px;
+        padding-right: 10px;
+        spacing: 10px;
+
+        Image {
+            width: 15px;
+            height: 15px;
+            y: (parent.height - self.height) / 2;
+            source: root.icon;
+            image-fit: contain;
+        }
+
+        Text {
+            text: root.label;
+            color: root.is-active ? #ffffff : (nav-touch.has-hover ? #dddddd : #8a8a96);
+            font-size: 11px;
+            font-weight: root.is-active ? 700 : 500;
+            vertical-alignment: center;
+        }
+    }
+}
+
 export component PlaylistWindow inherits Window {
     title: "NetCassette";
     icon: @image-url("icons/play.png");
@@ -32,11 +69,13 @@ export component PlaylistWindow inherits Window {
     in-out property <string> track-artist: "Ready";
     in-out property <bool> is-playing: false;
     in-out property <image> track-cover: @image-url("icons/play.png");
+    in-out property <int> active-tab: 0;
 
     callback close-clicked();
     callback play-clicked();
     callback prev-clicked();
     callback next-clicked();
+    callback open-music-folder-clicked();
 
     // Внутренняя панель в стиле кассеты
     Rectangle {
@@ -88,9 +127,95 @@ export component PlaylistWindow inherits Window {
                 }
             }
 
-            // Чистая зона для будущего контента
-            Rectangle {
+            // Центральная рабочая зона: Навигация слева + Контент справа
+            HorizontalLayout {
                 vertical-stretch: 1;
+                spacing: 12px;
+                padding-top: 8px;
+                padding-bottom: 8px;
+
+                // Левая панель навигации
+                VerticalLayout {
+                    width: 130px;
+                    spacing: 4px;
+
+                    NavItem {
+                        icon: @image-url("icons/home.png");
+                        label: "Главная";
+                        is-active: root.active-tab == 0;
+                        clicked => { root.active-tab = 0; }
+                    }
+
+                    NavItem {
+                        icon: @image-url("icons/network.png");
+                        label: "Сеть";
+                        is-active: root.active-tab == 1;
+                        clicked => { root.active-tab = 1; }
+                    }
+
+                    NavItem {
+                        icon: @image-url("icons/folder.png");
+                        label: "Папка";
+                        is-active: false;
+                        clicked => { root.open-music-folder-clicked(); }
+                    }
+
+                    NavItem {
+                        icon: @image-url("icons/info.png");
+                        label: "Инфо";
+                        is-active: root.active-tab == 2;
+                        clicked => { root.active-tab = 2; }
+                    }
+
+                    Rectangle {
+                        vertical-stretch: 1;
+                    }
+                }
+
+                // Разделитель
+                Rectangle {
+                    width: 1px;
+                    background: #282828;
+                }
+
+                // Правая область с экранами
+                Rectangle {
+                    horizontal-stretch: 1;
+                    clip: true;
+
+                    // Экран: Главная (пока пустой)
+                    if root.active-tab == 0 : Rectangle {
+                        Text {
+                            text: "Главная страница";
+                            color: #4a4a54;
+                            font-size: 13px;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    // Экран: Сеть
+                    if root.active-tab == 1 : Rectangle {
+                        Text {
+                            text: "Торрент-сеть и скачивание треков";
+                            color: #4a4a54;
+                            font-size: 13px;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+
+                    // Экран: Инфо
+                    if root.active-tab == 2 : Rectangle {
+                        Text {
+                            text: "NetCassette v1.0\nP2P Music Player";
+                            color: #4a4a54;
+                            font-size: 13px;
+                            horizontal-alignment: center;
+                            vertical-alignment: center;
+                        }
+                    }
+                }
             }
 
             // Нижняя линия воспроизведения
