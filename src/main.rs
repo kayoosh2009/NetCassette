@@ -176,6 +176,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
     // Background Tokio task: Live MPRIS synchronization & command dispatch
     let mpris_ui_handle = app_handle.clone();
+    let mpris_playlist_handle = playlist_handle.clone();
     tokio::spawn(async move {
         let Ok(conn) = zbus::Connection::session().await else {
             tracing::warn!("Could not connect to session D-Bus for MPRIS");
@@ -275,7 +276,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                 };
 
                                 let handle = mpris_ui_handle.clone();
-                                let pl_sync_handle = playlist_handle.clone();
+                                let pl_sync_handle = mpris_playlist_handle.clone();
                                 let title_for_pl = title.clone();
                                 let artist_for_pl = artist.clone();
                                 let _ = slint::invoke_from_event_loop(move || {
