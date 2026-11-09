@@ -146,17 +146,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                 last_art_url = art_url.clone();
                                 last_status = is_playing;
 
-                                // Fetch or load album cover image
-                                let cover_image = if !art_url.is_empty() {
+                                // Resolve path in background thread safely (Send-compatible)
+                                let cover_path: Option<std::path::PathBuf> = if !art_url.is_empty() {
                                     if art_url.starts_with("file://") {
                                         let file_path = art_url.trim_start_matches("file://");
-                                        slint::Image::load_from_path(std::path::Path::new(file_path)).ok()
+                                        Some(std::path::PathBuf::from(file_path))
                                     } else if art_url.starts_with("http://") || art_url.starts_with("https://") {
                                         if let Ok(resp) = reqwest::get(&art_url).await {
                                             if let Ok(bytes) = resp.bytes().await {
                                                 let temp_cover = std::env::temp_dir().join("netcassette_cover_cache.img");
                                                 if std::fs::write(&temp_cover, bytes).is_ok() {
-                                                    slint::Image::load_from_path(&temp_cover).ok()
+                                                    Some(temp_cover)
                                                 } else {
                                                     None
                                                 }
@@ -175,8 +175,10 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                         ui.set_track_title(title.into());
                                         ui.set_track_artist(artist.into());
                                         ui.set_is_playing(is_playing);
-                                        if let Some(img) = cover_image {
-                                            ui.set_track_cover(img);
+                                        if let Some(path) = cover_path {
+                                            if let Ok(img) = slint::Image::load_from_path(&path) {
+                                                ui.set_track_cover(img);
+                                            }
                                         }
                                     }
                                 });
