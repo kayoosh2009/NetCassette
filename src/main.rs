@@ -21,6 +21,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let app = MainWindow::new()?;
     let app_handle = app.as_weak();
 
+    let playlist_win = PlaylistWindow::new()?;
+    let playlist_handle = playlist_win.as_weak();
+
     // Command bridge to send UI clicks to Linux MPRIS players
     enum MprisCmd { PlayPause, Stop, Next, Previous }
     let (cmd_tx, mut cmd_rx) = tokio::sync::mpsc::unbounded_channel::<MprisCmd>();
@@ -32,8 +35,8 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     });
 
-    // Detect screen resolution using xrandr / drm early for handlers
-    let screen_width = std::process::Command::new("xrandr")
+    // Detect screen dimensions for window placement
+    let (screen_width, screen_height) = std::process::Command::new("xrandr")
         .output()
         .ok()
         .and_then(|out| {
@@ -41,18 +44,13 @@ async fn main() -> Result<(), Box<dyn Error>> {
             s.lines().find(|l| l.contains(" connected primary") || l.contains(" connected")).and_then(|l| {
                 let chunk = l.split_whitespace().find(|w| w.contains('x') && w.contains('+'))?;
                 let res = chunk.split('+').next()?;
-                let w = res.split('x').next()?.parse::<f32>().ok()?;
-                Some(w)
+                let mut parts = res.split('x');
+                let w = parts.next()?.parse::<f32>().ok()?;
+                let h = parts.next()?.parse::<f32>().ok()?;
+                Some((w, h))
             })
         })
-        .or_else(|| {
-            std::fs::read_dir("/sys/class/drm").ok()?.find_map(|e| {
-                let content = std::fs::read_to_string(e.ok()?.path().join("modes")).ok()?;
-                let first = content.lines().next()?;
-                first.split('x').next()?.parse::<f32>().ok()
-            })
-        })
-        .unwrap_or(1920.0);
+        .unwrap_or((1920.0, 1080.0));
 
     // Persistent configuration structure
     #[derive(serde::Serialize, serde::Deserialize, Clone)]
@@ -299,13 +297,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     });
 
-    app.on_toggle_menu({
-        let handle = app_handle.clone();
-        move || {
-            if let Some(ui) = handle.upgrade() {
-                let open = !ui.get_menu_open();
-                ui.set_menu_open(open);
-                info!(menu_open = open, "Menu toggled");
+    let pl_toggle_handle = playlist_handle.clone();
+    let mut playlist_is_open = false;
+    app.on_toggle_menu(move || {
+        if let Some(pl) = pl_toggle_handle.upgrade() {
+            playlist_is_open = !playlist_is_open;
+            if playlist_is_open {
+                let win_w = 760.0;
+                let win_h = 520.0;
+                let center_x = ((screen_width - win_w) / 2.0).max(0.0);
+                let center_y = ((screen_height - win_h) / 2.0).max(0.0);
+                pl.window().set_position(slint::LogicalPosition::new(center_x, center_y));
+                let _ = pl.show();
+                info!("Playlist hub centered & opened ( ＾◡＾)っ");
+            } else {
+                let _ = pl.hide();
+                info!("Playlist hub tucked away (˘ω˘)");
             }
         }
     });
