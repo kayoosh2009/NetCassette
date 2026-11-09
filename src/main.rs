@@ -32,6 +32,28 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     });
 
+    // Detect screen resolution using xrandr / drm early for handlers
+    let screen_width = std::process::Command::new("xrandr")
+        .output()
+        .ok()
+        .and_then(|out| {
+            let s = String::from_utf8_lossy(&out.stdout);
+            s.lines().find(|l| l.contains(" connected primary") || l.contains(" connected")).and_then(|l| {
+                let chunk = l.split_whitespace().find(|w| w.contains('x') && w.contains('+'))?;
+                let res = chunk.split('+').next()?;
+                let w = res.split('x').next()?.parse::<f32>().ok()?;
+                Some(w)
+            })
+        })
+        .or_else(|| {
+            std::fs::read_dir("/sys/class/drm").ok()?.find_map(|e| {
+                let content = std::fs::read_to_string(e.ok()?.path().join("modes")).ok()?;
+                let first = content.lines().next()?;
+                first.split('x').next()?.parse::<f32>().ok()
+            })
+        })
+        .unwrap_or(1920.0);
+
     // Persistent configuration structure
     #[derive(serde::Serialize, serde::Deserialize, Clone)]
     struct AppConfig {
@@ -287,28 +309,6 @@ async fn main() -> Result<(), Box<dyn Error>> {
             }
         }
     });
-
-    // Detect screen resolution using xrandr / drm
-    let screen_width = std::process::Command::new("xrandr")
-        .output()
-        .ok()
-        .and_then(|out| {
-            let s = String::from_utf8_lossy(&out.stdout);
-            s.lines().find(|l| l.contains(" connected primary") || l.contains(" connected")).and_then(|l| {
-                let chunk = l.split_whitespace().find(|w| w.contains('x') && w.contains('+'))?;
-                let res = chunk.split('+').next()?;
-                let w = res.split('x').next()?.parse::<f32>().ok()?;
-                Some(w)
-            })
-        })
-        .or_else(|| {
-            std::fs::read_dir("/sys/class/drm").ok()?.find_map(|e| {
-                let content = std::fs::read_to_string(e.ok()?.path().join("modes")).ok()?;
-                let first = content.lines().next()?;
-                first.split('x').next()?.parse::<f32>().ok()
-            })
-        })
-        .unwrap_or(1920.0);
 
     // Force KDE KWin to treat this window as a system desktop dock (no taskbar icon, always on top)
     let apply_kde_dock_rules = || {
