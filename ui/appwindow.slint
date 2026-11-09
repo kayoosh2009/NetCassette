@@ -43,9 +43,7 @@ export component MainWindow inherits Window {
     in-out property <string> track-artist: "Ready";
     in-out property <image> track-cover: @image-url("icons/play.png");
 
-    in-out property <bool> shift-pressed: false;
-    in-out property <length> drag-start-x: 0px;
-    in-out property <length> drag-start-y: 0px;
+    in-out property <length> drag-last-y: 0px;
 
     callback play-clicked();
     callback stop-clicked();
@@ -53,43 +51,32 @@ export component MainWindow inherits Window {
     callback prev-clicked();
     callback toggle-menu();
     callback hover-changed(bool);
-    callback move-window(length, length);
+    callback move-window-y(length);
     callback quit-app();
 
-    forward-focus: key-scope;
-    key-scope := FocusScope {
-        key-pressed(e) => {
-            if e.modifiers.shift { root.shift-pressed = true; }
-            reject
-        }
-        key-released(e) => {
-            if !e.modifiers.shift { root.shift-pressed = false; }
-            reject
-        }
-    }
-
-    // Hover & drag sensor covering the full viewport
+    // Hover & LMB vertical drag sensor
     hover-sensor := TouchArea {
         width: 100%;
         height: 100%;
-        mouse-cursor: root.shift-pressed ? move : default;
+        mouse-cursor: self.pressed ? row-resize : default;
 
         pointer-event(event) => {
             if event.kind == PointerEventKind.down {
-                root.drag-start-x = self.mouse-x;
-                root.drag-start-y = self.mouse-y;
+                root.drag-last-y = self.mouse-y;
             }
         }
 
         moved => {
             root.hover-changed(self.has-hover);
-            if self.pressed && root.shift-pressed {
-                root.move-window(self.mouse-x - root.drag-start-x, self.mouse-y - root.drag-start-y);
+            if self.pressed {
+                let dy = self.mouse-y - root.drag-last-y;
+                root.drag-last-y = self.mouse-y;
+                root.move-window-y(dy);
             }
         }
     }
 
-    // Sliding drawer panel
+    // Sliding drawer panel with semi-transparent tucked state
     card := Rectangle {
         x: (root.is-revealed || root.menu-open) ? 0px : (root.width - 8px);
         y: 0px;
@@ -101,9 +88,21 @@ export component MainWindow inherits Window {
         border-color: #383838;
         clip: true;
 
-        animate x {
+        opacity: (root.is-revealed || root.menu-open) ? 1.0 : 0.35;
+
+        animate x, opacity {
             duration: 220ms;
             easing: ease-out;
+        }
+
+        // Accent edge indicator when tucked
+        Rectangle {
+            x: 0px;
+            y: 0px;
+            width: 3px;
+            height: parent.height;
+            background: #ffffff;
+            opacity: (root.is-revealed || root.menu-open) ? 0.0 : 0.7;
         }
 
         VerticalLayout {

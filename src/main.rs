@@ -32,15 +32,14 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     });
 
-    // Manual Shift + Drag positioning handler
-    app.on_move_window({
+    // Fluid LMB vertical slide handler (keeps X docked, adjusts Y)
+    app.on_move_window_y({
         let handle = app_handle.clone();
-        move |dx, dy| {
+        move |dy| {
             if let Some(ui) = handle.upgrade() {
                 let current_pos = ui.window().position();
-                let next_x = current_pos.x + dx as i32;
-                let next_y = current_pos.y + dy as i32;
-                ui.window().set_position(slint::PhysicalPosition::new(next_x, next_y));
+                let next_y = (current_pos.y + dy as i32).max(0);
+                ui.window().set_position(slint::PhysicalPosition::new(current_pos.x, next_y));
             }
         }
     });
