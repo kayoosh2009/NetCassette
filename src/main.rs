@@ -275,6 +275,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                 };
 
                                 let handle = mpris_ui_handle.clone();
+                                let pl_sync_handle = playlist_handle.clone();
+                                let title_for_pl = title.clone();
+                                let artist_for_pl = artist.clone();
                                 let _ = slint::invoke_from_event_loop(move || {
                                     if let Some(ui) = handle.upgrade() {
                                         ui.set_track_title(title.into());
@@ -285,6 +288,11 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                                 ui.set_track_cover(img);
                                             }
                                         }
+                                    }
+                                    if let Some(pl) = pl_sync_handle.upgrade() {
+                                        pl.set_track_title(title_for_pl.into());
+                                        pl.set_track_artist(artist_for_pl.into());
+                                        pl.set_is_playing(is_playing);
                                     }
                                 });
                             }
@@ -297,24 +305,58 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     });
 
+    use std::sync::atomic::{AtomicBool, Ordering};
+    let playlist_is_open = std::sync::Arc::new(AtomicBool::new(false));
+
+    // Меню кассеты: открыть / скрыть окно по центру
     let pl_toggle_handle = playlist_handle.clone();
-    let mut playlist_is_open = false;
+    let open_state_toggle = playlist_is_open.clone();
     app.on_toggle_menu(move || {
         if let Some(pl) = pl_toggle_handle.upgrade() {
-            playlist_is_open = !playlist_is_open;
-            if playlist_is_open {
-                let win_w = 760.0;
-                let win_h = 520.0;
+            let was_open = open_state_toggle.load(Ordering::SeqCst);
+            let next_state = !was_open;
+            open_state_toggle.store(next_state, Ordering::SeqCst);
+
+            if next_state {
+                let win_w = 680.0;
+                let win_h = 440.0;
                 let center_x = ((screen_width - win_w) / 2.0).max(0.0);
                 let center_y = ((screen_height - win_h) / 2.0).max(0.0);
                 pl.window().set_position(slint::LogicalPosition::new(center_x, center_y));
                 let _ = pl.show();
-                info!("Playlist hub centered & opened ( ＾◡＾)っ");
+                info!("Playlist window opened ( ＾◡＾)っ");
             } else {
                 let _ = pl.hide();
-                info!("Playlist hub tucked away (˘ω˘)");
+                info!("Playlist window hidden (˘ω˘)");
             }
         }
+    });
+
+    // Крестик в окне
+    let pl_close_handle = playlist_handle.clone();
+    let open_state_close = playlist_is_open.clone();
+    playlist_win.on_close_clicked(move || {
+        if let Some(pl) = pl_close_handle.upgrade() {
+            let _ = pl.hide();
+            open_state_close.store(false, Ordering::SeqCst);
+            info!("Playlist window closed via cross button (•‿•)");
+        }
+    });
+
+    // Кнопки управления треком из окна плейлиста
+    let tx_pl_play = cmd_tx.clone();
+    playlist_win.on_play_clicked(move || {
+        let _ = tx_pl_play.send(MprisCmd::PlayPause);
+    });
+
+    let tx_pl_prev = cmd_tx.clone();
+    playlist_win.on_prev_clicked(move || {
+        let _ = tx_pl_prev.send(MprisCmd::Previous);
+    });
+
+    let tx_pl_next = cmd_tx.clone();
+    playlist_win.on_next_clicked(move || {
+        let _ = tx_pl_next.send(MprisCmd::Next);
     });
 
     // Force KDE KWin to treat this window as a system desktop dock (no taskbar icon, always on top)
