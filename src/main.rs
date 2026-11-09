@@ -79,6 +79,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
 
         let mut last_title = String::new();
         let mut last_artist = String::new();
+        let mut last_art_url = String::new();
         let mut last_status = false;
 
         loop {
@@ -137,10 +138,36 @@ async fn main() -> Result<(), Box<dyn Error>> {
                             let artist = extract_meta("xesam:artist")
                                 .unwrap_or_else(|| player_name.as_str().replace("org.mpris.MediaPlayer2.", ""));
 
-                            if title != last_title || artist != last_artist || is_playing != last_status {
+                            let art_url = extract_meta("mpris:artUrl").unwrap_or_default();
+
+                            if title != last_title || artist != last_artist || is_playing != last_status || art_url != last_art_url {
                                 last_title = title.clone();
                                 last_artist = artist.clone();
+                                last_art_url = art_url.clone();
                                 last_status = is_playing;
+
+                                // Fetch or load album cover image
+                                let cover_image = if !art_url.is_empty() {
+                                    if art_url.starts_with("file://") {
+                                        let file_path = art_url.trim_start_matches("file://");
+                                        slint::Image::load_from_path(std::path::Path::new(file_path)).ok()
+                                    } else if art_url.starts_with("http://") || art_url.starts_with("https://") {
+                                        if let Ok(resp) = reqwest::get(&art_url).await {
+                                            if let Ok(bytes) = resp.bytes().await {
+                                                let temp_cover = std::env::temp_dir().join("netcassette_cover_cache.img");
+                                                if std::fs::write(&temp_cover, bytes).is_ok() {
+                                                    slint::Image::load_from_path(&temp_cover).ok()
+                                                } else {
+                                                    None
+                                                }
+                                            } else { None }
+                                        } else { None }
+                                    } else {
+                                        None
+                                    }
+                                } else {
+                                    None
+                                };
 
                                 let handle = mpris_ui_handle.clone();
                                 let _ = slint::invoke_from_event_loop(move || {
@@ -148,6 +175,9 @@ async fn main() -> Result<(), Box<dyn Error>> {
                                         ui.set_track_title(title.into());
                                         ui.set_track_artist(artist.into());
                                         ui.set_is_playing(is_playing);
+                                        if let Some(img) = cover_image {
+                                            ui.set_track_cover(img);
+                                        }
                                     }
                                 });
                             }
