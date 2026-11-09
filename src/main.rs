@@ -231,30 +231,58 @@ async fn main() -> Result<(), Box<dyn Error>> {
         })
         .unwrap_or(1920.0);
 
-    // Convert window to background desktop overlay (skip taskbar & pager, stay on top)
+    // Force KDE KWin to treat this window as a system desktop dock (no taskbar icon, always on top)
+    let apply_kde_dock_rules = || {
+        // 1. Set X11 DOCK window type so Plasma taskbar removes the icon immediately
+        let _ = std::process::Command::new("xprop")
+            .args([
+                "-name", "NetCassette",
+                "-f", "_NET_WM_WINDOW_TYPE", "32a",
+                "-set", "_NET_WM_WINDOW_TYPE", "_NET_WM_WINDOW_TYPE_DOCK"
+            ])
+            .status();
+
+        let _ = std::process::Command::new("xprop")
+            .args([
+                "-name", "NetCassette",
+                "-f", "_NET_WM_STATE", "32a",
+                "-set", "_NET_WM_STATE",
+                "_NET_WM_STATE_SKIP_TASKBAR, _NET_WM_STATE_SKIP_PAGER, _NET_WM_STATE_ABOVE, _NET_WM_STATE_STICKY"
+            ])
+            .status();
+
+        let _ = std::process::Command::new("wmctrl")
+            .args(["-r", "NetCassette", "-b", "add,skip_taskbar,skip_pager,above,sticky"])
+            .status();
+
+        // 2. Register native KWin rule into KDE configuration
+        for cmd in &["kwriteconfig6", "kwriteconfig5"] {
+            let _ = std::process::Command::new(cmd).args(["--file", "kwinrulesrc", "--group", "NetCassetteDock", "--key", "wmclass", "netcassette"]).status();
+            let _ = std::process::Command::new(cmd).args(["--file", "kwinrulesrc", "--group", "NetCassetteDock", "--key", "wmclassmatch", "1"]).status();
+            let _ = std::process::Command::new(cmd).args(["--file", "kwinrulesrc", "--group", "NetCassetteDock", "--key", "skiptaskbar", "true"]).status();
+            let _ = std::process::Command::new(cmd).args(["--file", "kwinrulesrc", "--group", "NetCassetteDock", "--key", "skiptaskbarrule", "2"]).status();
+            let _ = std::process::Command::new(cmd).args(["--file", "kwinrulesrc", "--group", "NetCassetteDock", "--key", "above", "true"]).status();
+            let _ = std::process::Command::new(cmd).args(["--file", "kwinrulesrc", "--group", "NetCassetteDock", "--key", "aboverule", "2"]).status();
+        }
+
+        // Notify KWin to reload rules
+        let _ = std::process::Command::new("qdbus6").args(["org.kde.KWin", "/KWin", "reconfigure"]).status();
+        let _ = std::process::Command::new("qdbus").args(["org.kde.KWin", "/KWin", "reconfigure"]).status();
+    };
+
+    // Apply rules with retry to catch the X11 surface right when KWin maps it
     let dock_handle = app_handle.clone();
-    slint::Timer::single_shot(std::time::Duration::from_millis(150), move || {
+    slint::Timer::single_shot(std::time::Duration::from_millis(100), move || {
         if let Some(ui) = dock_handle.upgrade() {
             let target_x = screen_width - 360.0;
-            let target_y = 0.0;
-
-            ui.window().set_position(slint::LogicalPosition::new(target_x, target_y));
-            info!(target_x, "Desktop overlay active: pinning always on top (★ω★)");
-
-            // Strip from KDE Taskbar, Alt-Tab switcher and pin Above
-            let _ = std::process::Command::new("xprop")
-                .args([
-                    "-name", "NetCassette",
-                    "-f", "_NET_WM_STATE", "32a",
-                    "-set", "_NET_WM_STATE",
-                    "_NET_WM_STATE_SKIP_TASKBAR, _NET_WM_STATE_SKIP_PAGER, _NET_WM_STATE_ABOVE"
-                ])
-                .spawn();
-
-            let _ = std::process::Command::new("wmctrl")
-                .args(["-r", "NetCassette", "-b", "add,skip_taskbar,skip_pager,above"])
-                .spawn();
+            ui.window().set_position(slint::LogicalPosition::new(target_x, 0.0));
+            apply_kde_dock_rules();
+            info!("KDE Dock rules applied: stripped from panel and pinned on top (ﾉ´ヮ`)ﾉ*: ･ﾟ");
         }
+    });
+
+    slint::Timer::single_shot(std::time::Duration::from_millis(500), move || {
+        apply_kde_dock_rules();
     });
 
     // 7-second cooldown auto-hide controller
