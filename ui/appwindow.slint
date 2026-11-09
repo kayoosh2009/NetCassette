@@ -54,6 +54,7 @@ export component MainWindow inherits Window {
     callback toggle-menu();
     callback hover-changed(bool);
     callback move-window(length, length);
+    callback quit-app();
 
     forward-focus: key-scope;
     key-scope := FocusScope {
@@ -250,6 +251,25 @@ export component MainWindow inherits Window {
                             font-size: 11px;
                             horizontal-alignment: center;
                             vertical-alignment: center;
+                        }
+                    }
+
+                    // Exit Widget Action
+                    Rectangle {
+                        height: 32px;
+                        background: #2a2222;
+                        border-radius: 6px;
+
+                        TouchArea {
+                            clicked => { root.quit-app(); }
+                            Text {
+                                text: "Quit NetCassette";
+                                color: #f87171;
+                                font-size: 11px;
+                                font-weight: 700;
+                                horizontal-alignment: center;
+                                vertical-alignment: center;
+                            }
                         }
                     }
                 }

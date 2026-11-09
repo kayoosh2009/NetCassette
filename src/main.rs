@@ -45,6 +45,12 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     });
 
+    // Clean exit from menu
+    app.on_quit_app(|| {
+        info!("Exiting NetCassette background widget ( ˘ω˘ )ﾉ");
+        std::process::exit(0);
+    });
+
     // Forward Play/Pause to system player
     let tx_play = cmd_tx.clone();
     app.on_play_clicked(move || {
@@ -225,29 +231,29 @@ async fn main() -> Result<(), Box<dyn Error>> {
         })
         .unwrap_or(1920.0);
 
-    // Dock firmly into KDE right corner right after window is registered
+    // Convert window to background desktop overlay (skip taskbar & pager, stay on top)
     let dock_handle = app_handle.clone();
     slint::Timer::single_shot(std::time::Duration::from_millis(150), move || {
         if let Some(ui) = dock_handle.upgrade() {
             let target_x = screen_width - 360.0;
             let target_y = 0.0;
 
-            let pos_before = ui.window().position();
-            info!(?pos_before, "Window position before set_position request");
-
             ui.window().set_position(slint::LogicalPosition::new(target_x, target_y));
+            info!(target_x, "Desktop overlay active: pinning always on top (★ω★)");
 
-            let pos_after = ui.window().position();
-            info!(?pos_after, target_x, target_y, "Window position after set_position request");
+            // Strip from KDE Taskbar, Alt-Tab switcher and pin Above
+            let _ = std::process::Command::new("xprop")
+                .args([
+                    "-name", "NetCassette",
+                    "-f", "_NET_WM_STATE", "32a",
+                    "-set", "_NET_WM_STATE",
+                    "_NET_WM_STATE_SKIP_TASKBAR, _NET_WM_STATE_SKIP_PAGER, _NET_WM_STATE_ABOVE"
+                ])
+                .spawn();
 
-            // If KWin ignored Winit set_position, try kdotool / xdotool
-            let actual_x = pos_after.x as f32;
-            if (actual_x - target_x).abs() > 50.0 {
-                info!(actual_x, target_x, "KWin ignored standard positioning, attempting xdotool fallback... (¬_¬)");
-                let _ = std::process::Command::new("xdotool")
-                    .args(["search", "--name", "NetCassette", "windowmove", &target_x.to_string(), "0"])
-                    .status();
-            }
+            let _ = std::process::Command::new("wmctrl")
+                .args(["-r", "NetCassette", "-b", "add,skip_taskbar,skip_pager,above"])
+                .spawn();
         }
     });
 
