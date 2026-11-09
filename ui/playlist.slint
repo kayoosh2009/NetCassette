@@ -1,0 +1,19 @@
+export component PlaylistWindow inherits Window {
+    title: "NetCassette";
+    icon: @image-url("icons/play.png");
+    width: 680px;
+    height: 440px;
+    background: #262626;
+
+    // Внутренняя панель в стиле кассеты
+    Rectangle {
+        x: 10px;
+        y: 10px;
+        width: parent.width - 20px;
+        height: parent.height - 20px;
+        background: #1c1c1c;
+        border-radius: 12px;
+        border-width: 1px;
+        border-color: #383838;
+    }
+}
