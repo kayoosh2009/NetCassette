@@ -60,8 +60,8 @@ impl TorrentEngine {
     }
 
     pub fn list_swarms(&self) -> Vec<TorrentItemStats> {
-        let mut list = Vec::new();
         self.session.with_torrents(|torrents| {
+            let mut list = Vec::new();
             for (id, handle) in torrents {
                 let stats = handle.stats();
                 let total = stats.total_bytes;
@@ -83,7 +83,7 @@ impl TorrentEngine {
                     live_peers: 0,
                 });
             }
-        });
-        list
+            list
+        })
     }
 }
