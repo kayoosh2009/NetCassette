@@ -53,6 +53,9 @@ impl TorrentEngine {
             AddTorrentResponse::AlreadyManaged(id, _) => {
                 Ok(format!("Swarm #{} is already in queue", id))
             }
+            AddTorrentResponse::ListOnly(_) => {
+                Ok("Torrent metadata received".to_string())
+            }
         }
     }
 
@@ -68,7 +71,7 @@ impl TorrentEngine {
                     0.0
                 };
 
-                let name = format!("Swarm #{} ({})", id, handle.shared().info_hash);
+                let name = format!("Swarm #{} ({:?})", id, handle.shared().info_hash);
 
                 list.push(TorrentItemStats {
                     id,
