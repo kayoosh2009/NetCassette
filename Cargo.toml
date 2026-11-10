@@ -15,6 +15,7 @@ tokio = { version = "1.43", features = ["full"] }
 # Сеть и потоковые данные
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "stream", "json"] }
 futures-util = "0.3"
+librqbit = "7"
 
 # Аудио движок под Linux (ALSA / Pulse / PipeWire)
 rodio = { version = "0.20", default-features = false, features = ["symphonia-all"] }

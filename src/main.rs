@@ -1,5 +1,7 @@
 slint::include_modules!();
 
+mod torrent;
+
 use std::error::Error;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
@@ -17,6 +19,22 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .expect("Failed to initialize tracing logger");
 
     info!("NetCassette MPRIS system media listener armed! (ง ͠° ͟ل͜ ͡°)ง");
+
+    // Инициализация P2P BitTorrent движка в папке Музыки
+    let music_dir = directories::UserDirs::new()
+        .and_then(|u| u.audio_dir().map(|p| p.join("NetCassette")))
+        .unwrap_or_else(|| std::path::PathBuf::from("./music"));
+
+    let torrent_engine = match torrent::TorrentEngine::new(&music_dir).await {
+        Ok(engine) => {
+            info!(path = ?music_dir, "P2P BitTorrent swarm engine initialized (★ω★)");
+            Some(std::sync::Arc::new(engine))
+        }
+        Err(err) => {
+            tracing::warn!(error = ?err, "Failed to start torrent engine");
+            None
+        }
+    };
 
     let app = MainWindow::new()?;
     let app_handle = app.as_weak();
