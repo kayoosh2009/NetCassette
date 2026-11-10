@@ -25,7 +25,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         .and_then(|u| u.audio_dir().map(|p| p.join("NetCassette")))
         .unwrap_or_else(|| std::path::PathBuf::from("./music"));
 
-    let torrent_engine = match torrent::TorrentEngine::new(&music_dir).await {
+    let _torrent_engine = match torrent::TorrentEngine::new(&music_dir).await {
         Ok(engine) => {
             info!(path = ?music_dir, "P2P BitTorrent swarm engine initialized (★ω★)");
             Some(std::sync::Arc::new(engine))

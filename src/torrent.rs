@@ -1,7 +1,7 @@
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use librqbit::{AddTorrent, AddTorrentOptions, AddTorrentResponse, Session, SessionOptions};
-use tracing::{info, warn};
+use tracing::info;
 
 #[derive(Clone, Debug)]
 pub struct TorrentItemStats {
@@ -39,7 +39,7 @@ impl TorrentEngine {
     }
 
     pub async fn add_magnet(&self, magnet: &str) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
-        let add_torrent = AddTorrent::from_url(magnet)?;
+        let add_torrent = AddTorrent::from_url(magnet);
         let opts = Some(AddTorrentOptions {
             overwrite: false,
             ..Default::default()
@@ -68,9 +68,7 @@ impl TorrentEngine {
                     0.0
                 };
 
-                let name = handle.with_state(|state| {
-                    state.info().and_then(|i| i.name().map(|n| n.to_string()))
-                }).unwrap_or_else(|| format!("Swarm #{}", id));
+                let name = format!("Swarm #{} ({})", id, handle.shared().info_hash);
 
                 list.push(TorrentItemStats {
                     id,
@@ -79,7 +77,7 @@ impl TorrentEngine {
                     is_finished: stats.finished,
                     total_bytes: total,
                     downloaded_bytes: stats.progress_bytes,
-                    live_peers: stats.live_peers,
+                    live_peers: 0,
                 });
             }
         });
