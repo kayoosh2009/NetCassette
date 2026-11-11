@@ -50,7 +50,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     });
 
     // Default screen dimensions for initial placement
-    let (screen_width, screen_height) = (1920.0, 1080.0);
+    let (screen_width, screen_height): (f32, f32) = (1920.0, 1080.0);
 
     // Persistent configuration structure
     #[derive(serde::Serialize, serde::Deserialize, Clone)]
