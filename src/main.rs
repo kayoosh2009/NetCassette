@@ -1,78 +1,13 @@
 slint::include_modules!();
 
+mod cassette;
 mod torrent;
 
-use id3::TagLike;
 use std::error::Error;
-use std::io::Read;
+use std::sync::Arc;
 use tokio::sync::Mutex as TokioMutex;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
-
-struct LoadedSong {
-    audio_data: Vec<u8>,
-    title: String,
-    artist: String,
-    cover_data: Option<Vec<u8>>,
-    lyrics: String,
-}
-
-fn parse_cassette_file(path: &std::path::Path) -> Option<LoadedSong> {
-    let mut mp3_bytes = Vec::new();
-    let mut lyrics = String::new();
-    let default_title = path.file_stem().and_then(|s| s.to_str()).unwrap_or("Unknown").to_string();
-
-    if path.extension().and_then(|e| e.to_str()) == Some("zip") {
-        let file = std::fs::File::open(path).ok()?;
-        let mut archive = zip::ZipArchive::new(file).ok()?;
-
-        for i in 0..archive.len() {
-            if let Ok(mut item) = archive.by_index(i) {
-                let name = item.name().to_lowercase();
-                if name.ends_with(".mp3") {
-                    let mut buf = Vec::new();
-                    let _ = item.read_to_end(&mut buf);
-                    mp3_bytes = buf;
-                } else if name.ends_with(".txt") {
-                    let mut txt = String::new();
-                    let _ = item.read_to_string(&mut txt);
-                    lyrics = txt;
-                }
-            }
-        }
-    } else if path.extension().and_then(|e| e.to_str()) == Some("mp3") {
-        mp3_bytes = std::fs::read(path).ok()?;
-    }
-
-    if mp3_bytes.is_empty() {
-        return None;
-    }
-
-    // Читаем ID3 теги и вшитую обложку
-    let mut title = default_title;
-    let mut artist = "NetCassette".to_string();
-    let mut cover_data = None;
-
-    if let Ok(tag) = id3::Tag::read_from2(std::io::Cursor::new(&mp3_bytes)) {
-        if let Some(t) = tag.title() {
-            title = t.to_string();
-        }
-        if let Some(a) = tag.artist() {
-            artist = a.to_string();
-        }
-        if let Some(picture) = tag.pictures().next() {
-            cover_data = Some(picture.data.to_vec());
-        }
-    }
-
-    Some(LoadedSong {
-        audio_data: mp3_bytes,
-        title,
-        artist,
-        cover_data,
-        lyrics,
-    })
-}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -433,6 +368,17 @@ async fn main() -> Result<(), Box<dyn Error>> {
         }
     });
 
+    // Свободное перемещение окна библиотеки за шапку
+    let pl_move_handle = playlist_handle.clone();
+    playlist_win.on_move_window(move |dx, dy| {
+        if let Some(pl) = pl_move_handle.upgrade() {
+            let current_pos = pl.window().position();
+            let new_x = current_pos.x + dx as i32;
+            let new_y = current_pos.y + dy as i32;
+            pl.window().set_position(slint::PhysicalPosition::new(new_x, new_y));
+        }
+    });
+
     // Открытие папки музыки в проводнике KDE / Dolphin
     playlist_win.on_open_music_folder_clicked(|| {
         let music_dir = directories::UserDirs::new()
@@ -464,7 +410,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                     let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
                     if ext == "zip" || ext == "mp3" {
                         let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
-                        if let Some(info) = parse_cassette_file(&path) {
+                        if let Some(info) = cassette::parse_cassette_file(&path) {
                             list.push(SongItem {
                                 filename: filename.into(),
                                 title: info.title.into(),
@@ -489,7 +435,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let play_app_handle = app_handle.clone();
     playlist_win.on_play_song_clicked(move |filename| {
         let file_path = play_dir.join(filename.as_str());
-        if let Some(loaded) = parse_cassette_file(&file_path) {
+        if let Some(loaded) = cassette::parse_cassette_file(&file_path) {
             let sink_arc = play_sink.clone();
             let audio_bytes = loaded.audio_data.clone();
 
