@@ -58,6 +58,14 @@ component NavItem inherits Rectangle {
     }
 }
 
+export struct SlintTorrentItem {
+    id: int;
+    name: string;
+    progress: float;
+    is-finished: bool;
+    live-peers: int;
+}
+
 export component PlaylistWindow inherits Window {
     title: "NetCassette";
     icon: @image-url("icons/play.png");
@@ -72,13 +80,6 @@ export component PlaylistWindow inherits Window {
     in-out property <int> active-tab: 0;
     in-out property <string> magnet-input: "";
 
-    export struct SlintTorrentItem {
-        id: int;
-        name: string;
-        progress: float;
-        is-finished: bool;
-        live-peers: int;
-    }
     in-out property <[SlintTorrentItem]> swarms-list: [];
 
     callback close-clicked();
