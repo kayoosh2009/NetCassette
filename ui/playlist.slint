@@ -72,12 +72,12 @@ export component PlaylistWindow inherits Window {
     in-out property <int> active-tab: 0;
     in-out property <string> magnet-input: "";
 
-    struct SlintTorrentItem {
-        id: int,
-        name: string,
-        progress: float,
-        is-finished: bool,
-        live-peers: int,
+    export struct SlintTorrentItem {
+        id: int;
+        name: string;
+        progress: float;
+        is-finished: bool;
+        live-peers: int;
     }
     in-out property <[SlintTorrentItem]> swarms-list: [];
 
