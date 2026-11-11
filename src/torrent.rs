@@ -18,7 +18,6 @@ pub struct TorrentItemStats {
 
 pub struct TorrentEngine {
     session: Arc<Session>,
-    download_dir: PathBuf,
 }
 
 impl TorrentEngine {
@@ -27,7 +26,7 @@ impl TorrentEngine {
         std::fs::create_dir_all(&dir)?;
 
         let session = Session::new_with_opts(
-            dir.clone(),
+            dir,
             SessionOptions {
                 disable_dht: false,
                 ..Default::default()
@@ -36,7 +35,6 @@ impl TorrentEngine {
 
         Ok(Self {
             session,
-            download_dir: dir,
         })
     }
 
@@ -59,10 +57,6 @@ impl TorrentEngine {
                 Ok("Torrent metadata received".to_string())
             }
         }
-    }
-
-    pub fn get_download_dir(&self) -> &Path {
-        &self.download_dir
     }
 
     pub async fn add_path_for_seeding<P: AsRef<Path>>(&self, path: P) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
@@ -106,7 +100,7 @@ impl TorrentEngine {
 
         let add_torrent = AddTorrent::from_bytes(torrent_bytes);
         let opts = Some(AddTorrentOptions {
-            overwrite: false,
+            overwrite: true,
             ..Default::default()
         });
 
