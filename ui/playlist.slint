@@ -58,6 +58,13 @@ component NavItem inherits Rectangle {
     }
 }
 
+export struct SongItem {
+    filename: string,
+    title: string,
+    artist: string,
+    has-lyrics: bool,
+}
+
 export struct SlintTorrentItem {
     id: int,
     name: string,
@@ -81,9 +88,13 @@ export component PlaylistWindow inherits Window {
     in-out property <int> active-tab: 0;
     in-out property <string> magnet-input: "";
 
-    in-out property <[SlintTorrentItem]> swarms-list: [];
+    in-out property <[SongItem]> songs-list: [];
+    in-out property <string> current-lyrics: "";
+    in-out property <bool> show-lyrics: false;
 
     callback close-clicked();
+    callback play-song-clicked(string);
+    callback toggle-lyrics-clicked();
     callback add-magnet-clicked();
     callback seed-music-clicked();
     callback play-clicked();
@@ -197,14 +208,150 @@ export component PlaylistWindow inherits Window {
                     horizontal-stretch: 1;
                     clip: true;
 
-                    // Экран: Главная (пока пустой)
-                    if root.active-tab == 0 : Rectangle {
-                        Text {
-                            text: "Главная страница";
-                            color: #4a4a54;
-                            font-size: 13px;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
+                    // Экран: Главная (Библиотека кассет)
+                    if root.active-tab == 0 : VerticalLayout {
+                        padding: 10px;
+                        spacing: 8px;
+
+                        // Верхняя панель библиотеки
+                        HorizontalLayout {
+                            height: 26px;
+                            alignment: space-between;
+
+                            Text {
+                                text: "КАССЕТЫ В БИБЛИОТЕКЕ";
+                                color: #888888;
+                                font-size: 11px;
+                                font-weight: 700;
+                                vertical-alignment: center;
+                            }
+
+                            if root.show-lyrics : Rectangle {
+                                width: 70px;
+                                height: 22px;
+                                border-radius: 4px;
+                                background: #333338;
+                                TouchArea {
+                                    clicked => { root.show-lyrics = false; }
+                                }
+                                Text {
+                                    text: "К списку";
+                                    color: #ccc;
+                                    font-size: 10px;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+
+                        // Если открыт текст песни — показываем вкладыш
+                        if root.show-lyrics : Rectangle {
+                            vertical-stretch: 1;
+                            background: #141416;
+                            border-radius: 8px;
+                            border-width: 1px;
+                            border-color: #2b2b32;
+                            clip: true;
+
+                            Flickable {
+                                width: 100%;
+                                height: 100%;
+                                VerticalLayout {
+                                    padding: 14px;
+                                    Text {
+                                        text: root.current-lyrics;
+                                        color: #e0e0e0;
+                                        font-size: 12px;
+                                        wrap: word-wrap;
+                                    }
+                                }
+                            }
+                        }
+
+                        // Иначе — список найденных кассет
+                        if !root.show-lyrics : Rectangle {
+                            vertical-stretch: 1;
+                            background: #141416;
+                            border-radius: 8px;
+                            border-width: 1px;
+                            border-color: #26262b;
+                            clip: true;
+
+                            Flickable {
+                                width: 100%;
+                                height: 100%;
+
+                                VerticalLayout {
+                                    padding: 6px;
+                                    spacing: 4px;
+
+                                    for song in root.songs-list : Rectangle {
+                                        height: 44px;
+                                        border-radius: 6px;
+                                        background: item-touch.pressed ? #2d2d35 : (item-touch.has-hover ? #222228 : transparent);
+
+                                        item-touch := TouchArea {
+                                            clicked => { root.play-song-clicked(song.filename); }
+                                        }
+
+                                        HorizontalLayout {
+                                            padding-left: 10px;
+                                            padding-right: 10px;
+                                            spacing: 10px;
+
+                                            Text {
+                                                text: "📼";
+                                                font-size: 14px;
+                                                vertical-alignment: center;
+                                            }
+
+                                            VerticalLayout {
+                                                alignment: center;
+                                                spacing: 2px;
+                                                horizontal-stretch: 1;
+
+                                                Text {
+                                                    text: song.title;
+                                                    color: #f0f0f0;
+                                                    font-size: 12px;
+                                                    font-weight: 600;
+                                                    overflow: elide;
+                                                }
+
+                                                Text {
+                                                    text: song.artist;
+                                                    color: #777782;
+                                                    font-size: 10px;
+                                                    overflow: elide;
+                                                }
+                                            }
+
+                                            if song.has-lyrics : Rectangle {
+                                                width: 50px;
+                                                height: 20px;
+                                                y: (parent.height - self.height) / 2;
+                                                border-radius: 4px;
+                                                background: #202026;
+
+                                                TouchArea {
+                                                    clicked => {
+                                                        root.play-song-clicked(song.filename);
+                                                        root.show-lyrics = true;
+                                                    }
+                                                }
+
+                                                Text {
+                                                    text: "Текст";
+                                                    color: #9999aa;
+                                                    font-size: 9px;
+                                                    horizontal-alignment: center;
+                                                    vertical-alignment: center;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
 

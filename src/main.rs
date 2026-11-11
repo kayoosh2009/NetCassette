@@ -3,8 +3,76 @@ slint::include_modules!();
 mod torrent;
 
 use std::error::Error;
+use std::io::Read;
+use std::sync::Arc;
+use tokio::sync::Mutex as TokioMutex;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
+
+struct LoadedSong {
+    audio_data: Vec<u8>,
+    title: String,
+    artist: String,
+    cover_data: Option<Vec<u8>>,
+    lyrics: String,
+}
+
+fn parse_cassette_file(path: &std::path::Path) -> Option<LoadedSong> {
+    let mut mp3_bytes = Vec::new();
+    let mut lyrics = String::new();
+    let default_title = path.file_stem().and_then(|s| s.to_str()).unwrap_or("Unknown").to_string();
+
+    if path.extension().and_then(|e| e.to_str()) == Some("zip") {
+        let file = std::fs::File::open(path).ok()?;
+        let mut archive = zip::ZipArchive::new(file).ok()?;
+
+        for i in 0..archive.len() {
+            if let Ok(mut item) = archive.by_index(i) {
+                let name = item.name().to_lowercase();
+                if name.ends_with(".mp3") {
+                    let mut buf = Vec::new();
+                    let _ = item.read_to_end(&mut buf);
+                    mp3_bytes = buf;
+                } else if name.ends_with(".txt") {
+                    let mut txt = String::new();
+                    let _ = item.read_to_string(&mut txt);
+                    lyrics = txt;
+                }
+            }
+        }
+    } else if path.extension().and_then(|e| e.to_str()) == Some("mp3") {
+        mp3_bytes = std::fs::read(path).ok()?;
+    }
+
+    if mp3_bytes.is_empty() {
+        return None;
+    }
+
+    // Читаем ID3 теги и вшитую обложку
+    let mut title = default_title;
+    let mut artist = "NetCassette".to_string();
+    let mut cover_data = None;
+
+    if let Ok(tag) = id3::Tag::read_from2(std::io::Cursor::new(&mp3_bytes)) {
+        if let Some(t) = tag.title() {
+            title = t.to_string();
+        }
+        if let Some(a) = tag.artist() {
+            artist = a.to_string();
+        }
+        if let Some(picture) = tag.pictures().next() {
+            cover_data = Some(picture.data.to_vec());
+        }
+    }
+
+    Some(LoadedSong {
+        audio_data: mp3_bytes,
+        title,
+        artist,
+        cover_data,
+        lyrics,
+    })
+}
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn Error>> {
@@ -375,9 +443,121 @@ async fn main() -> Result<(), Box<dyn Error>> {
         info!("Opened NetCassette music folder (•‿•)");
     });
 
+    // Инициализация локального аудиовыхода Rodio
+    let audio_stream = rodio::OutputStream::try_default().ok();
+    let audio_sink = audio_stream.as_ref().and_then(|(_stream, handle)| {
+        rodio::Sink::try_new(handle).ok()
+    });
+    let sink_holder = Arc::new(TokioMutex::new(audio_sink));
+
+    // Сканирование папки музыки и заполнение библиотеки
+    let music_dir_scan = music_dir.clone();
+    let pl_load_handle = playlist_handle.clone();
+    let refresh_library = {
+        let dir = music_dir_scan.clone();
+        let handle = pl_load_handle.clone();
+        move || {
+            let mut list = Vec::new();
+            if let Ok(entries) = std::fs::read_dir(&dir) {
+                for entry in entries.flatten() {
+                    let path = entry.path();
+                    let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+                    if ext == "zip" || ext == "mp3" {
+                        let filename = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_string();
+                        if let Some(info) = parse_cassette_file(&path) {
+                            list.push(SongItem {
+                                filename: filename.into(),
+                                title: info.title.into(),
+                                artist: info.artist.into(),
+                                has_lyrics: !info.lyrics.is_empty(),
+                            });
+                        }
+                    }
+                }
+            }
+            if let Some(pl) = handle.upgrade() {
+                pl.set_songs_list(std::rc::Rc::new(slint::VecModel::from(list)).into());
+            }
+        }
+    };
+    refresh_library();
+
+    // Воспроизведение трека из библиотеки кассет по клику
+    let play_sink = sink_holder.clone();
+    let play_dir = music_dir.clone();
+    let play_pl_handle = playlist_handle.clone();
+    let play_app_handle = app_handle.clone();
+    playlist_win.on_play_song_clicked(move |filename| {
+        let file_path = play_dir.join(filename.as_str());
+        if let Some(loaded) = parse_cassette_file(&file_path) {
+            let sink_arc = play_sink.clone();
+            let audio_bytes = loaded.audio_data.clone();
+
+            tokio::spawn(async move {
+                let mut lock = sink_arc.lock().await;
+                if let Some(ref sink) = *lock {
+                    sink.stop();
+                    if let Ok(source) = rodio::Decoder::new(std::io::Cursor::new(audio_bytes)) {
+                        sink.append(source);
+                        sink.play();
+                    }
+                }
+            });
+
+            // Обновляем обложку и метаданные в обоих окнах
+            let cover_path = if let Some(ref data) = loaded.cover_data {
+                let cache_path = std::env::temp_dir().join("netcassette_embedded_cover.jpg");
+                let _ = std::fs::write(&cache_path, data);
+                Some(cache_path)
+            } else {
+                None
+            };
+
+            let title = loaded.title.clone();
+            let artist = loaded.artist.clone();
+            let lyrics = loaded.lyrics.clone();
+            let pl_h = play_pl_handle.clone();
+            let app_h = play_app_handle.clone();
+
+            let _ = slint::invoke_from_event_loop(move || {
+                let img = cover_path.as_ref().and_then(|p| slint::Image::load_from_path(p).ok());
+
+                if let Some(pl) = pl_h.upgrade() {
+                    pl.set_track_title(title.clone().into());
+                    pl.set_track_artist(artist.clone().into());
+                    pl.set_is_playing(true);
+                    pl.set_current_lyrics(lyrics.into());
+                    if let Some(ref c) = img {
+                        pl.set_track_cover(c.clone());
+                    }
+                }
+                if let Some(app) = app_h.upgrade() {
+                    app.set_track_title(title.into());
+                    app.set_track_artist(artist.into());
+                    app.set_is_playing(true);
+                    if let Some(ref c) = img {
+                        app.set_track_cover(c.clone());
+                    }
+                }
+            });
+        }
+    });
+
     // Кнопки управления треком из окна плейлиста
     let tx_pl_play = cmd_tx.clone();
+    let local_play_sink = sink_holder.clone();
     playlist_win.on_play_clicked(move || {
+        let sink_arc = local_play_sink.clone();
+        tokio::spawn(async move {
+            let lock = sink_arc.lock().await;
+            if let Some(ref sink) = *lock {
+                if sink.is_paused() {
+                    sink.play();
+                } else if !sink.empty() {
+                    sink.pause();
+                }
+            }
+        });
         let _ = tx_pl_play.send(MprisCmd::PlayPause);
     });
 
