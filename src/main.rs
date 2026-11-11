@@ -463,7 +463,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
                         live_peers: s.live_peers as i32,
                     });
                 }
-                pl.set_swarms_list(slint::ModelRc::new(slint::VecModel::from(mapped)));
+                pl.set_swarms_list(std::rc::Rc::new(slint::VecModel::from(mapped)).into());
             }
         }
     });

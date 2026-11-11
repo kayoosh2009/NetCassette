@@ -61,7 +61,8 @@ impl TorrentEngine {
 
     pub async fn add_path_for_seeding<P: AsRef<Path>>(&self, path: P) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
         let path_ref = path.as_ref();
-        let add_torrent = AddTorrent::from_path(path_ref.into());
+        let path_str = path_ref.to_str().ok_or("Invalid path encoding")?;
+        let add_torrent = AddTorrent::from_local_filename(path_str)?;
         let opts = Some(AddTorrentOptions {
             overwrite: false,
             ..Default::default()
@@ -71,12 +72,12 @@ impl TorrentEngine {
             AddTorrentResponse::Added(id, handle) => {
                 let info_hash = handle.shared().info_hash;
                 info!(id, ?path_ref, "File/folder added for P2P seeding (★ω★)");
-                let magnet = format!("magnet:?xt=urn:btih:{}", info_hash);
+                let magnet = format!("magnet:?xt=urn:btih:{:?}", info_hash);
                 Ok(magnet)
             }
             AddTorrentResponse::AlreadyManaged(id, handle) => {
                 let info_hash = handle.shared().info_hash;
-                let magnet = format!("magnet:?xt=urn:btih:{}", info_hash);
+                let magnet = format!("magnet:?xt=urn:btih:{:?}", info_hash);
                 Ok(magnet)
             }
             AddTorrentResponse::ListOnly(_) => {
