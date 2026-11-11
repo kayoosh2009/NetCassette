@@ -2,9 +2,9 @@ slint::include_modules!();
 
 mod torrent;
 
+use id3::TagLike;
 use std::error::Error;
 use std::io::Read;
-use std::sync::Arc;
 use tokio::sync::Mutex as TokioMutex;
 use tracing::{info, Level};
 use tracing_subscriber::FmtSubscriber;
@@ -494,7 +494,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
             let audio_bytes = loaded.audio_data.clone();
 
             tokio::spawn(async move {
-                let mut lock = sink_arc.lock().await;
+                let lock = sink_arc.lock().await;
                 if let Some(ref sink) = *lock {
                     sink.stop();
                     if let Ok(source) = rodio::Decoder::new(std::io::Cursor::new(audio_bytes)) {
