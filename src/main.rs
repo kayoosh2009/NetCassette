@@ -455,12 +455,21 @@ async fn main() -> Result<(), Box<dyn Error>> {
                 let stats_vec = engine.list_swarms();
                 let mut mapped = Vec::new();
                 for s in stats_vec {
+                    let size_mb = s.downloaded_bytes as f64 / 1_048_576.0;
+                    let total_mb = s.total_bytes as f64 / 1_048_576.0;
+                    let size_text = if total_mb > 0.0 {
+                        format!("{:.1} MB / {:.1} MB", size_mb, total_mb)
+                    } else {
+                        "Загрузка метаданных...".to_string()
+                    };
+
                     mapped.push(SlintTorrentItem {
                         id: s.id as i32,
                         name: s.name.into(),
                         progress: s.progress,
                         is_finished: s.is_finished,
                         live_peers: s.live_peers as i32,
+                        size_text: size_text.into(),
                     });
                 }
                 pl.set_swarms_list(std::rc::Rc::new(slint::VecModel::from(mapped)).into());

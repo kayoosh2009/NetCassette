@@ -64,6 +64,7 @@ export struct SlintTorrentItem {
     progress: float,
     is-finished: bool,
     live-peers: int,
+    size-text: string,
 }
 
 export component PlaylistWindow inherits Window {
@@ -315,7 +316,7 @@ export component PlaylistWindow inherits Window {
                                                 }
 
                                                 Text {
-                                                    text: "Прогресс: " + Math.round(swarm.progress * 100) + "% | Пиров: " + swarm.live-peers;
+                                                    text: "Прогресс: " + Math.round(swarm.progress * 100) + "% (" + swarm.size-text + ") | Пиров: " + swarm.live-peers;
                                                     color: #888;
                                                     font-size: 10px;
                                                 }
