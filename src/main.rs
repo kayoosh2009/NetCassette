@@ -391,7 +391,84 @@ async fn main() -> Result<(), Box<dyn Error>> {
         let _ = tx_pl_next.send(MprisCmd::Next);
     });
 
-    // Force KDE KWin to treat this window as a system desktop dock (no taskbar icon, always on top)
+    let pl_torrent_engine = _torrent_engine.clone();
+    let pl_window_handle = playlist_handle.clone();
+    playlist_win.on_add_magnet_clicked(move || {
+        if let Some(pl) = pl_window_handle.upgrade() {
+            let magnet = pl.get_magnet_input().to_string();
+            if !magnet.is_empty() {
+                if let Some(ref engine) = pl_torrent_engine {
+                    let eng = engine.clone();
+                    let mag = magnet.clone();
+                    tokio::spawn(async move {
+                        match eng.add_magnet(&mag).await {
+                            Ok(msg) => info!(msg, "Magnet link added successfully (•‿•)"),
+                            Err(e) => tracing::error!(error = ?e, "Failed to add magnet link"),
+                        }
+                    });
+                }
+                pl.set_magnet_input("".into());
+            }
+        }
+    });
+
+    let pl_seed_engine = _torrent_engine.clone();
+    playlist_win.on_seed_music_clicked(move || {
+        if let Some(ref engine) = pl_seed_engine {
+            let eng = engine.clone();
+            let music_dir = directories::UserDirs::new()
+                .and_then(|u| u.audio_dir().map(|p| p.join("NetCassette")))
+                .unwrap_or_else(|| std::path::PathBuf::from("./music"));
+
+            tokio::spawn(async move {
+                if let Ok(mut entries) = tokio::fs::read_dir(&music_dir).await {
+                    while let Ok(Some(entry)) = entries.next_entry().await {
+                        let path = entry.path();
+                        if path.is_file() {
+                            match eng.add_path_for_seeding(&path).await {
+                                Ok(magnet) => {
+                                    info!(?path, %magnet, "Started seeding song! Copy magnet to VM (ง ͠° ͟ل͜ ͡°)ง");
+                                    let _ = std::process::Command::new("xclip").args(["-selection", "clipboard"]).stdin(std::process::Stdio::piped()).spawn().and_then(|mut child| {
+                                        use std::io::Write;
+                                        if let Some(ref mut stdin) = child.stdin {
+                                            let _ = stdin.write_all(magnet.as_bytes());
+                                        }
+                                        Ok(())
+                                    });
+                                    break;
+                                }
+                                Err(e) => tracing::error!(error = ?e, "Failed to seed file"),
+                            }
+                        }
+                    }
+                }
+            });
+        }
+    });
+
+    let swarms_ui_handle = playlist_handle.clone();
+    let swarms_engine = _torrent_engine.clone();
+    let swarms_timer = slint::Timer::default();
+    swarms_timer.start(slint::TimerMode::Repeated, std::time::Duration::from_secs(1), move || {
+        if let Some(ref engine) = swarms_engine {
+            if let Some(pl) = swarms_ui_handle.upgrade() {
+                let stats_vec = engine.list_swarms();
+                let mut mapped = Vec::new();
+                for s in stats_vec {
+                    mapped.push(SlintTorrentItem {
+                        id: s.id as i32,
+                        name: s.name.into(),
+                        progress: s.progress,
+                        is_finished: s.is_finished,
+                        live_peers: s.live_peers as i32,
+                    });
+                }
+                pl.set_swarms_list(slint::ModelRc::new(slint::VecModel::from(mapped)));
+            }
+        }
+    });
+
+    // Force KDE KWin to treat this window as a system desktop dock
     let apply_kde_dock_rules = || {
         // 1. Set X11 DOCK window type so Plasma taskbar removes the icon immediately
         let _ = std::process::Command::new("xprop")

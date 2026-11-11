@@ -59,6 +59,32 @@ impl TorrentEngine {
         }
     }
 
+    pub async fn add_path_for_seeding<P: AsRef<Path>>(&self, path: P) -> Result<String, Box<dyn std::error::Error + Send + Sync>> {
+        let path_ref = path.as_ref();
+        let add_torrent = AddTorrent::from_path(path_ref.into());
+        let opts = Some(AddTorrentOptions {
+            overwrite: false,
+            ..Default::default()
+        });
+
+        match self.session.add_torrent(add_torrent, opts).await? {
+            AddTorrentResponse::Added(id, handle) => {
+                let info_hash = handle.shared().info_hash;
+                info!(id, ?path_ref, "File/folder added for P2P seeding (★ω★)");
+                let magnet = format!("magnet:?xt=urn:btih:{}", hex::encode(info_hash));
+                Ok(magnet)
+            }
+            AddTorrentResponse::AlreadyManaged(id, handle) => {
+                let info_hash = handle.shared().info_hash;
+                let magnet = format!("magnet:?xt=urn:btih:{}", hex::encode(info_hash));
+                Ok(magnet)
+            }
+            AddTorrentResponse::ListOnly(_) => {
+                Ok("Seeding metadata generated".to_string())
+            }
+        }
+    }
+
     pub fn list_swarms(&self) -> Vec<TorrentItemStats> {
         self.session.with_torrents(|torrents| {
             let mut list = Vec::new();

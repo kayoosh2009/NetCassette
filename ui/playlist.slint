@@ -70,8 +70,20 @@ export component PlaylistWindow inherits Window {
     in-out property <bool> is-playing: false;
     in-out property <image> track-cover: @image-url("icons/play.png");
     in-out property <int> active-tab: 0;
+    in-out property <string> magnet-input: "";
+
+    struct SlintTorrentItem {
+        id: int,
+        name: string,
+        progress: float,
+        is-finished: bool,
+        live-peers: int,
+    }
+    in-out property <[SlintTorrentItem]> swarms-list: [];
 
     callback close-clicked();
+    callback add-magnet-clicked();
+    callback seed-music-clicked();
     callback play-clicked();
     callback prev-clicked();
     callback next-clicked();
@@ -195,16 +207,124 @@ export component PlaylistWindow inherits Window {
                     }
 
                     // Экран: Сеть
-                    if root.active-tab == 1 : Rectangle {
-                        Text {
-                            text: "Торрент-сеть и скачивание треков";
-                            color: #4a4a54;
-                            font-size: 13px;
-                            horizontal-alignment: center;
-                            vertical-alignment: center;
+                    if root.active-tab == 1 : VerticalLayout {
+                        padding: 10px;
+                        spacing: 10px;
+
+                        HorizontalLayout {
+                            spacing: 8px;
+                            height: 32px;
+
+                            Rectangle {
+                                horizontal-stretch: 1;
+                                background: #161616;
+                                border-radius: 6px;
+                                border-width: 1px;
+                                border-color: #333;
+
+                                TextInput {
+                                    x: 8px;
+                                    y: (parent.height - self.height) / 2;
+                                    width: parent.width - 16px;
+                                    text <=> root.magnet-input;
+                                    font-size: 11px;
+                                    color: #fff;
+                                    selection-background-color: #555;
+                                }
+                            }
+
+                            Rectangle {
+                                width: 90px;
+                                border-radius: 6px;
+                                background: dl-touch.pressed ? #2563eb : (dl-touch.has-hover ? #3b82f6 : #1d4ed8);
+
+                                dl-touch := TouchArea {
+                                    clicked => { root.add-magnet-clicked(); }
+                                }
+
+                                Text {
+                                    text: "Скачать";
+                                    color: #fff;
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+
+                            Rectangle {
+                                width: 110px;
+                                border-radius: 6px;
+                                background: seed-touch.pressed ? #047857 : (seed-touch.has-hover ? #10b981 : #059669);
+
+                                seed-touch := TouchArea {
+                                    clicked => { root.seed-music-clicked(); }
+                                }
+
+                                Text {
+                                    text: "Поделиться";
+                                    color: #fff;
+                                    font-size: 11px;
+                                    font-weight: 600;
+                                    horizontal-alignment: center;
+                                    vertical-alignment: center;
+                                }
+                            }
+                        }
+
+                        Rectangle {
+                            vertical-stretch: 1;
+                            background: #141414;
+                            border-radius: 6px;
+                            border-width: 1px;
+                            border-color: #262626;
+                            clip: true;
+
+                            Flickable {
+                                width: 100%;
+                                height: 100%;
+
+                                VerticalLayout {
+                                    padding: 8px;
+                                    spacing: 6px;
+
+                                    for swarm in root.swarms-list : Rectangle {
+                                        height: 44px;
+                                        background: #1c1c20;
+                                        border-radius: 6px;
+                                        border-width: 1px;
+                                        border-color: #2a2a30;
+
+                                        HorizontalLayout {
+                                            padding-left: 10px;
+                                            padding-right: 10px;
+                                            alignment: space-between;
+
+                                            VerticalLayout {
+                                                alignment: center;
+                                                spacing: 3px;
+                                                horizontal-stretch: 1;
+
+                                                Text {
+                                                    text: swarm.name;
+                                                    color: #fff;
+                                                    font-size: 11px;
+                                                    font-weight: 600;
+                                                    overflow: elide;
+                                                }
+
+                                                Text {
+                                                    text: "Прогресс: " + Math.round(swarm.progress * 100) + "% | Пиров: " + swarm.live-peers;
+                                                    color: #888;
+                                                    font-size: 10px;
+                                                }
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
-
                     // Экран: Инфо
                     if root.active-tab == 2 : Rectangle {
                         Text {
