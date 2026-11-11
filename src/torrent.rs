@@ -71,12 +71,12 @@ impl TorrentEngine {
             AddTorrentResponse::Added(id, handle) => {
                 let info_hash = handle.shared().info_hash;
                 info!(id, ?path_ref, "File/folder added for P2P seeding (★ω★)");
-                let magnet = format!("magnet:?xt=urn:btih:{}", hex::encode(info_hash));
+                let magnet = format!("magnet:?xt=urn:btih:{}", info_hash);
                 Ok(magnet)
             }
             AddTorrentResponse::AlreadyManaged(id, handle) => {
                 let info_hash = handle.shared().info_hash;
-                let magnet = format!("magnet:?xt=urn:btih:{}", hex::encode(info_hash));
+                let magnet = format!("magnet:?xt=urn:btih:{}", info_hash);
                 Ok(magnet)
             }
             AddTorrentResponse::ListOnly(_) => {
